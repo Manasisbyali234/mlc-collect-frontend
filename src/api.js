@@ -19,16 +19,16 @@ export const api = {
   verifyOtp: (mobile, otp) => req('POST', '/otp/verify', { mobile, otp }),
   setPassword: (mobile, otp, password) => req('POST', '/set-password', { mobile, otp, password }),
 
-  getMembers: () => req('GET', '/members'),
+  getMembers: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/members${qs ? '?' + qs : ''}`); },
   getMember: (id) => req('GET', `/members/${id}`),
   createMember: (data) => req('POST', '/members', data),
 
-  getApplications: () => req('GET', '/applications'),
+  getApplications: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/applications${qs ? '?' + qs : ''}`); },
   getApplication: (id) => req('GET', `/applications/${id}`),
   saveApplication: (data) => req('POST', '/applications', data),
   updateApplication: (id, data) => req('PATCH', `/applications/${id}`, data),
 
-  getLoanAccounts: () => req('GET', '/loan-accounts'),
+  getLoanAccounts: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/loan-accounts${qs ? '?' + qs : ''}`); },
   createLoanAccount: (data) => req('POST', '/loan-accounts', data),
 
   getCollections: (params = {}) => {

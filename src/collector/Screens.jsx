@@ -16,7 +16,7 @@ export function Home() {
   const [stats, setStats] = useState(null);
   const nav = useNavigate();
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
-  useEffect(() => { Promise.resolve().then(() => api.getDashboard().then(setStats).catch(() => {})); }, []);
+  useEffect(() => { api.getDashboard({ collectorId: user.id }).then(setStats).catch(() => {}); }, []);
   return (
     <>
       <PageHeader title={`Namaskara, ${user.name}`} sub={`Collector · ${user.branch || ''} · ${new Date().toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })}`}>
@@ -113,7 +113,7 @@ export function Customer() {
   const [members, setMembers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  useEffect(() => { Promise.resolve().then(() => api.getMembers().then(setMembers).finally(() => setLoading(false))); }, []);
+  useEffect(() => { Promise.resolve().then(() => api.getMembers({ collectorId: user.id }).then(setMembers).finally(() => setLoading(false))); }, []);
   const filtered = members.filter(m => {
     const q = search.toLowerCase();
     return !q || [m.name, m.mobile, m.memberId].some(v => v && v.toLowerCase().includes(q));
@@ -163,7 +163,7 @@ export function Record() {
   const nav = useNavigate();
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
 
-  useEffect(() => { api.getMembers().then(setMembers).catch(() => {}); }, []);
+  useEffect(() => { api.getMembers({ collectorId: user.id }).then(setMembers).catch(() => {}); }, []);
 
   const suggestions = memberSearch.length > 0
     ? members.filter(m => [m.name, m.mobile, m.memberId].some(v => v && v.toLowerCase().includes(memberSearch.toLowerCase()))).slice(0, 6)
@@ -264,7 +264,7 @@ export function Record() {
 export function LoanAccount() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { Promise.resolve().then(() => api.getLoanAccounts().then(setAccounts).finally(() => setLoading(false))); }, []);
+  useEffect(() => { Promise.resolve().then(() => api.getLoanAccounts({ collectorId: user.id }).then(setAccounts).finally(() => setLoading(false))); }, []);
   return (
     <>
       <PageHeader title="Loan Accounts" sub="All active loan accounts" />

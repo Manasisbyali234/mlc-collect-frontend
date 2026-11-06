@@ -44,7 +44,8 @@ export function LoanCollection() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get('status') || 'All';
   const nav = useNavigate();
-  useEffect(() => { api.getApplications().then(setApps).finally(() => setLoading(false)); }, []);
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+  useEffect(() => { api.getApplications({ collectorId: user.id }).then(setApps).finally(() => setLoading(false)); }, []);
   const counts = {
     total: apps.length,
     draft: apps.filter(a => a.status === 'Draft').length,
