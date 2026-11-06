@@ -1,4 +1,4 @@
-const BASE = '/api';
+const BASE = 'https://mlc-collect-backend.vercel.app/api';
 
 async function req(method, path, body) {
   const res = await fetch(BASE + path, {
