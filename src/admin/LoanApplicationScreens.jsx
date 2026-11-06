@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 
-const STATUS_ORDER = ['Pending Admin Approval','Under Review','Sanctioned','Approved','Rejected','Disbursed'];
-const SC = { 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Sanctioned:'yellow', Approved:'green', Rejected:'red', Disbursed:'green', Draft:'grey' };
+const STATUS_ORDER = ['Pending Admin Approval','Under Review','Sanctioned','Approved','Rejected','Disbursed','NPA','Recovery','Recovered','Written Off'];
+const SC = { 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Sanctioned:'yellow', Approved:'green', Rejected:'red', Disbursed:'green', Draft:'grey', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
 const Pill = ({ c, children }) => <span className={'pill ' + c}>{children}</span>;
-const SANCTION_FEE = 250;
+function calcFee(amount) { return Math.floor(Number(amount) / 5000) * 250; }
 
 /* ===== Admin: Loan Applications List ===== */
 export function LoanApplications() {
@@ -74,8 +74,15 @@ export function ApplicationDetail() {
   const [confirmedRate, setConfirmedRate] = useState('');
   const [disbursalRef, setDisbursalRef] = useState('');
   const [showReject, setShowReject] = useState(false);
+  const [recoveryNote, setRecoveryNote] = useState('');
 
-  useEffect(() => { api.getApplication(appId).then(setApp).catch(() => setApp(null)).finally(() => setLoading(false)); }, [appId]);
+  useEffect(() => {
+    api.getApplication(appId).then(d => {
+      setApp(d);
+      setApprovedTenure(d.tenure || '');
+      setConfirmedRate(d.rate || '');
+    }).catch(() => setApp(null)).finally(() => setLoading(false));
+  }, [appId]);
 
   if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>;
   if (!app) return (
@@ -94,17 +101,20 @@ export function ApplicationDetail() {
 
   function handleSanction() {
     if (!sanctionAmount) { alert('Enter sanction amount'); return; }
-    const net = Number(sanctionAmount) - SANCTION_FEE;
-    if (net <= 0) { alert('Sanction amount must be greater than Rs.250'); return; }
+    const fee = calcFee(sanctionAmount);
+    const net = Number(sanctionAmount) - fee;
+    if (net <= 0) { alert('Sanction amount must be greater than Rs.5,000'); return; }
     const loanId = 'MCS-' + new Date().getFullYear().toString().slice(-2) + '-' + Math.random().toString(36).slice(2,8).toUpperCase();
-    updateStatus('Sanctioned', { sanctionAmount, netDisbursalAmount: net, sanctionRemark, loanId });
+    updateStatus('Sanctioned', { sanctionAmount, processingFee: fee, netDisbursalAmount: net, sanctionRemark, loanId });
   }
 
   function handleApprove() {
+    if (!approvedTenure || Number(approvedTenure) <= 0) { alert('Approved Tenure (days) is required'); return; }
+    if (!confirmedRate || Number(confirmedRate) <= 0) { alert('Interest Rate is required'); return; }
     updateStatus('Approved', {
       approvedAmount: app.sanctionAmount,
-      approvedTenure: approvedTenure || app.tenure,
-      confirmedRate: confirmedRate || app.rate,
+      approvedTenure,
+      confirmedRate,
       adminRemark: remark,
     });
   }
@@ -175,7 +185,7 @@ export function ApplicationDetail() {
               <div style={{ background:'var(--yellow-bg)', border:'1px solid var(--yellow-tx)', borderRadius:10, padding:12, marginTop:12 }}>
                 <div className='eyebrow' style={{ fontSize:11, marginBottom:6 }}>Sanction Details</div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  {[['Sanctioned Amount','Rs.'+app.sanctionAmount],['Processing Fee','Rs.'+SANCTION_FEE],['Net Disbursal Amount','Rs.'+app.netDisbursalAmount],['Loan ID',app.loanId]].map(([k,v]) => (
+                  {[['Total Amount','Rs.'+Number(app.sanctionAmount).toLocaleString('en-IN')],['Deduction','- Rs.'+(app.processingFee ?? calcFee(app.sanctionAmount)).toLocaleString('en-IN')],['Payable Amount','Rs.'+Number(app.netDisbursalAmount).toLocaleString('en-IN')],['Loan ID',app.loanId]].map(([k,v]) => (
                     <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono' style={k==='Net Disbursal Amount'?{fontWeight:700,color:'var(--green-tx)'}:{}}>{v}</span></div>
                   ))}
                 </div>
@@ -272,12 +282,13 @@ export function ApplicationDetail() {
               <>
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Sanction Amount (Rs.) *</label>
                 <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:4 }} value={sanctionAmount} onChange={e => setSanctionAmount(e.target.value)} placeholder={app.loanAmount} />
-                {sanctionAmount > 0 && (
+                {sanctionAmount > 0 && (() => { const fee = calcFee(sanctionAmount); const net = Number(sanctionAmount) - fee; return (
                   <div style={{ background:'rgba(255,255,255,.08)', borderRadius:8, padding:'8px 12px', marginBottom:8, fontSize:13 }}>
-                    <div style={{ color:'#cfe3d9' }}>Processing fee: <b>- Rs.{SANCTION_FEE}</b></div>
-                    <div style={{ color:'#fff', fontWeight:700, marginTop:2 }}>Net to borrower: <b className='mono'>Rs.{Number(sanctionAmount) - SANCTION_FEE}</b></div>
+                    <div style={{ color:'#cfe3d9' }}>Total amount: <b className='mono'>Rs.{Number(sanctionAmount).toLocaleString('en-IN')}</b></div>
+                    <div style={{ color:'#cfe3d9', marginTop:2 }}>Deduction: <b className='mono'>- Rs.{fee.toLocaleString('en-IN')}</b></div>
+                    <div style={{ color:'#fff', fontWeight:700, marginTop:4, fontSize:14 }}>Payable amount: <b className='mono'>Rs.{net.toLocaleString('en-IN')}</b></div>
                   </div>
-                )}
+                ); })()}
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Sanction Remarks</label>
                 <textarea className='input' style={{ padding:'8px 12px', fontSize:13, marginBottom:10, minHeight:50, resize:'vertical' }} value={sanctionRemark} onChange={e => setSanctionRemark(e.target.value)} placeholder='Optional remarks' />
                 <button className='btn gold block' style={{ marginBottom:8 }} onClick={handleSanction}>Sanction Loan</button>
@@ -287,26 +298,49 @@ export function ApplicationDetail() {
             {app.status === 'Sanctioned' && (
               <>
                 <div style={{ background:'rgba(255,255,255,.08)', borderRadius:8, padding:'10px 12px', marginBottom:10, fontSize:13 }}>
-                  <div style={{ color:'#cfe3d9' }}>Sanctioned: <b className='mono'>Rs.{app.sanctionAmount}</b></div>
-                  <div style={{ color:'#cfe3d9', marginTop:4 }}>Processing fee deducted: <b>- Rs.{SANCTION_FEE}</b></div>
-                  <div style={{ color:'#fff', fontWeight:700, marginTop:4, fontSize:15 }}>Net disbursal: <b className='mono'>Rs.{app.netDisbursalAmount}</b></div>
+                  <div style={{ color:'#cfe3d9' }}>Total amount: <b className='mono'>Rs.{Number(app.sanctionAmount).toLocaleString('en-IN')}</b></div>
+                  <div style={{ color:'#cfe3d9', marginTop:4 }}>Deduction: <b className='mono'>- Rs.{(app.processingFee ?? calcFee(app.sanctionAmount)).toLocaleString('en-IN')}</b></div>
+                  <div style={{ color:'#fff', fontWeight:700, marginTop:4, fontSize:15 }}>Payable amount: <b className='mono'>Rs.{Number(app.netDisbursalAmount).toLocaleString('en-IN')}</b></div>
                 </div>
-                <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Approved Tenure (days)</label>
-                <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} value={approvedTenure} onChange={e => setApprovedTenure(e.target.value)} placeholder={app.tenure} />
-                <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Confirm Interest Rate (%)</label>
-                <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} value={confirmedRate} onChange={e => setConfirmedRate(e.target.value)} placeholder={app.rate} />
+                <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Approved Tenure (days) <span style={{ color:'#f87171' }}>*</span></label>
+                <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} value={approvedTenure} onChange={e => setApprovedTenure(e.target.value)} placeholder='e.g. 55' />
+                <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Confirm Interest Rate (%) <span style={{ color:'#f87171' }}>*</span></label>
+                <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} value={confirmedRate} onChange={e => setConfirmedRate(e.target.value)} placeholder='e.g. 10' />
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Verification Remarks</label>
                 <textarea className='input' style={{ padding:'8px 12px', fontSize:13, marginBottom:10, minHeight:50, resize:'vertical' }} value={remark} onChange={e => setRemark(e.target.value)} placeholder='Optional remarks' />
                 <button className='btn gold block' style={{ marginBottom:8 }} onClick={handleApprove}>Approve Loan</button>
                 <button className='btn outline-red block' onClick={() => setShowReject(true)}>Reject Application</button>
               </>
             )}
+            {app.status === 'NPA' && (
+              <>
+                <div style={{ background:'rgba(248,113,113,.2)', border:'1px solid rgba(248,113,113,.5)', borderRadius:8, padding:'10px 12px', marginBottom:10, fontSize:13, color:'#fca5a5' }}>
+                  🔴 NPA — {app.missedStreak || '10+'} consecutive missed EMIs.
+                  {app.npaDate && <div style={{ marginTop:4, fontSize:12 }}>Flagged on: {app.npaDate}</div>}
+                </div>
+                <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Recovery Note</label>
+                <textarea className='input' style={{ padding:'8px 12px', fontSize:13, marginBottom:10, minHeight:60, resize:'vertical' }} value={recoveryNote} onChange={e => setRecoveryNote(e.target.value)} placeholder='Action taken / remarks' />
+                <button className='btn gold block' style={{ marginBottom:8 }} onClick={() => updateStatus('Recovered', { recoveryNote })}>Mark as Recovered</button>
+                <button className='btn outline-red block' onClick={() => updateStatus('Written Off', { recoveryNote })}>Write Off</button>
+              </>
+            )}
+            {app.status === 'Recovery' && (
+              <>
+                <div style={{ background:'rgba(248,113,113,.15)', border:'1px solid rgba(248,113,113,.4)', borderRadius:8, padding:'10px 12px', marginBottom:10, fontSize:13, color:'#fca5a5' }}>
+                  ⚠ Collector has flagged this loan for recovery.
+                </div>
+                <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Recovery Note</label>
+                <textarea className='input' style={{ padding:'8px 12px', fontSize:13, marginBottom:10, minHeight:60, resize:'vertical' }} value={recoveryNote} onChange={e => setRecoveryNote(e.target.value)} placeholder='Action taken / remarks' />
+                <button className='btn gold block' style={{ marginBottom:8 }} onClick={() => updateStatus('Recovered', { recoveryNote })}>Mark as Recovered</button>
+                <button className='btn outline-red block' onClick={() => updateStatus('Written Off', { recoveryNote })}>Write Off</button>
+              </>
+            )}
             {app.status === 'Approved' && !app.disbursalRef && (
               <>
                 <div style={{ background:'rgba(255,255,255,.08)', borderRadius:8, padding:'10px 12px', marginBottom:10, fontSize:13 }}>
-                  <div style={{ color:'#cfe3d9' }}>Sanctioned: <b className='mono'>Rs.{app.sanctionAmount}</b></div>
-                  <div style={{ color:'#cfe3d9', marginTop:4 }}>Processing fee: <b>- Rs.{SANCTION_FEE}</b></div>
-                  <div style={{ color:'#fff', fontWeight:700, marginTop:4, fontSize:15 }}>Net to borrower: <b className='mono'>Rs.{app.netDisbursalAmount}</b></div>
+                  <div style={{ color:'#cfe3d9' }}>Total amount: <b className='mono'>Rs.{Number(app.sanctionAmount).toLocaleString('en-IN')}</b></div>
+                  <div style={{ color:'#cfe3d9', marginTop:4 }}>Deduction: <b className='mono'>- Rs.{(app.processingFee ?? calcFee(app.sanctionAmount)).toLocaleString('en-IN')}</b></div>
+                  <div style={{ color:'#fff', fontWeight:700, marginTop:4, fontSize:15 }}>Payable amount: <b className='mono'>Rs.{Number(app.netDisbursalAmount).toLocaleString('en-IN')}</b></div>
                 </div>
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Disbursal Reference</label>
                 <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:10 }} value={disbursalRef} onChange={e => setDisbursalRef(e.target.value)} placeholder='UTR / cheque no.' />

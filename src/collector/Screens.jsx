@@ -297,23 +297,49 @@ export function Deposit() {
   const [how, setHow] = useState('Bank counter');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
+  const [collectedFrom, setCollectedFrom] = useState('');
+  const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [location, setLocation] = useState(null);
+  const [locLoading, setLocLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+
+  function captureLocation() {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => { setLocation({ lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) }); setLocLoading(false); },
+      () => { alert('Could not get location. Please allow location access.'); setLocLoading(false); }
+    );
+  }
+
+  function handlePhoto(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!['image/jpeg','image/png'].includes(file.type)) { alert('Only JPG/PNG allowed'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('Max 5 MB'); return; }
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
 
   async function handleSubmit() {
     if (!amount || !reference.trim()) { alert('Enter amount and reference'); return; }
     setSubmitting(true);
     try {
-      await Promise.resolve().then(() => api.saveDeposit({
-        collectorId: user.id,
-        collectorName: user.name,
-        amount,
-        method: how,
-        reference,
-        date: new Date().toLocaleDateString('en-IN'),
-        status: 'To verify',
-      }));
+      const fd = new FormData();
+      fd.append('collectorId', user.id);
+      fd.append('collectorName', user.name);
+      fd.append('amount', amount);
+      fd.append('method', how);
+      fd.append('reference', reference);
+      fd.append('collectedFrom', collectedFrom);
+      fd.append('date', new Date().toLocaleDateString('en-IN'));
+      fd.append('status', 'To verify');
+      if (location) fd.append('location', JSON.stringify(location));
+      if (photo) fd.append('photo', photo);
+      await api.saveDepositForm(fd);
       setSubmitted(true);
     } catch (e) { alert('Error: ' + e.message); }
     finally { setSubmitting(false); }
@@ -336,6 +362,33 @@ export function Deposit() {
             <div style={{ color: 'var(--gold)', fontWeight: 700, fontSize: 13, letterSpacing: '.08em' }}>MAHALAXMI CO-OPERATIVE SOCIETY LTD</div>
             <div style={{ margin: '6px 0', color: '#cfe3d9' }}>Society current account (shown for reference)</div>
             <div className="mono" style={{ fontSize: 16 }}>A/c XXXXXX7731 · IFSC KVGB0001234</div>
+          </div>
+          <div className="panel pad" style={{ marginBottom: 18 }}>
+            <div className="lbl">Collected from (person name)</div>
+            <input className="input" value={collectedFrom} onChange={e => setCollectedFrom(e.target.value)} placeholder="Name of person who paid" style={{ marginBottom: 18 }} />
+            <div className="lbl">Live location</div>
+            {location ? (
+              <div style={{ display:'flex', alignItems:'center', gap:10, border:'1px solid var(--g800)', borderRadius:12, padding:'10px 14px', background:'var(--green-bg)', marginBottom:14 }}>
+                <span style={{ fontSize:13, flex:1 }}>📍 {location.lat}, {location.lng}</span>
+                <button style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:12 }} onClick={() => setLocation(null)}>✕</button>
+              </div>
+            ) : (
+              <button className="btn outline" style={{ marginBottom:14, width:'100%' }} onClick={captureLocation} disabled={locLoading}>
+                {locLoading ? 'Getting location…' : '📍 Capture Live Location'}
+              </button>
+            )}
+            <div className="lbl">Photo proof</div>
+            {photoPreview ? (
+              <div style={{ marginBottom:14 }}>
+                <img src={photoPreview} alt="proof" style={{ width:'100%', maxHeight:200, objectFit:'cover', borderRadius:12, border:'1px solid var(--line)' }} />
+                <button style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:13, marginTop:6 }} onClick={() => { setPhoto(null); setPhotoPreview(null); }}>✕ Remove photo</button>
+              </div>
+            ) : (
+              <label style={{ display:'block', border:'1.5px dashed var(--line)', borderRadius:12, padding:14, textAlign:'center', cursor:'pointer', fontSize:13, color:'var(--muted)', marginBottom:14 }}>
+                📷 Take / Upload Photo (JPG/PNG, max 5MB)
+                <input type="file" accept="image/jpeg,image/png" capture="environment" style={{ display:'none' }} onChange={handlePhoto} />
+              </label>
+            )}
           </div>
         </div>
         <div>

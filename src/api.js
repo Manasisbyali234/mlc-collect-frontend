@@ -21,12 +21,19 @@ export const api = {
 
   getMembers: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/members${qs ? '?' + qs : ''}`); },
   getMember: (id) => req('GET', `/members/${id}`),
+  getMemberLoans: (id) => req('GET', `/members/${id}/loans`),
   createMember: (data) => req('POST', '/members', data),
+  createMemberForm: async (formData) => {
+    const res = await fetch(BASE + '/members', { method: 'POST', body: formData });
+    if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || res.statusText); }
+    return res.json();
+  },
 
   getApplications: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/applications${qs ? '?' + qs : ''}`); },
   getApplication: (id) => req('GET', `/applications/${id}`),
   saveApplication: (data) => req('POST', '/applications', data),
   updateApplication: (id, data) => req('PATCH', `/applications/${id}`, data),
+  autoNpa: () => req('POST', '/applications/auto-npa', {}),
 
   getLoanAccounts: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/loan-accounts${qs ? '?' + qs : ''}`); },
   createLoanAccount: (data) => req('POST', '/loan-accounts', data),
@@ -39,6 +46,11 @@ export const api = {
 
   getDeposits: () => req('GET', '/deposits'),
   saveDeposit: (data) => req('POST', '/deposits', data),
+  saveDepositForm: async (formData) => {
+    const res = await fetch(BASE + '/deposits', { method: 'POST', body: formData });
+    if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || res.statusText); }
+    return res.json();
+  },
   updateDeposit: (id, data) => req('PATCH', `/deposits/${id}`, data),
 
   getUsers: () => req('GET', '/users'),
@@ -57,6 +69,7 @@ export const api = {
   getReportDefaulters: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/defaulters${qs?'?'+qs:''}`); },
   getReportPaid: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/paid${qs?'?'+qs:''}`); },
   getReportCollectorWise: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/collector-wise${qs?'?'+qs:''}`); },
+  getReportClosing: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/closing${qs?'?'+qs:''}`); },
 
   getSanctionLetters: () => req('GET', '/sanction-letters'),
   getSanctionLetter: (id) => req('GET', `/sanction-letters/${id}`),

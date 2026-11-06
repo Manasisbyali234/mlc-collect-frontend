@@ -10,7 +10,7 @@ import {
 } from './collector/Screens.jsx';
 import AdminLayout from './admin/AdminLayout.jsx';
 import {
-  Dashboard, Alerts, CustomerProfile, OpenLoan, CollectionGrid,
+  Dashboard, Alerts, CustomerProfile, MemberDetail, OpenLoan, CollectionGrid,
   DepositVerification, Settings, CollectorTargets,
   LoanApplications, ApplicationDetail,
 } from './admin/Screens.jsx';
@@ -220,6 +220,7 @@ export default function App() {
       <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
         <Route index element={<Dashboard />} />
         <Route path="customers" element={<CustomerProfile />} />
+        <Route path="customers/:memberId" element={<MemberDetail />} />
         <Route path="loans" element={<OpenLoan />} />
         <Route path="collections" element={<CollectionGrid />} />
         <Route path="deposits" element={<DepositVerification />} />

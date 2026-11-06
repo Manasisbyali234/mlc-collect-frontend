@@ -685,6 +685,97 @@ function CollectorWiseReport() {
 /* ══════════════════════════════════════════
    MAIN REPORTS SCREEN
 ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   8. CLOSING REPORT
+══════════════════════════════════════════ */
+const CLOSE_COLS = [
+  { key: 'loanId', label: 'Loan ID' },
+  { key: 'appId', label: 'App ID' },
+  { key: 'memberName', label: 'Member Name' },
+  { key: 'memberId', label: 'Member ID' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'collectorName', label: 'Collector' },
+  { key: 'loanType', label: 'Loan Type' },
+  { key: 'loanAmount', label: 'Loan Amount' },
+  { key: 'totalPaid', label: 'Total Paid' },
+  { key: 'disbursalDate', label: 'Disbursal Date' },
+  { key: 'closeDate', label: 'Close Date' },
+  { key: 'status', label: 'Status' },
+];
+
+function ClosingReport() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [search, setSearch] = useState('');
+
+  function load() {
+    setLoading(true);
+    const params = {};
+    if (from) params.from = from;
+    if (to) params.to = to;
+    api.getReportClosing(params).then(setRows).catch(() => setRows([])).finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, []);
+
+  const filtered = rows.filter(r => {
+    const q = search.toLowerCase();
+    return !q || [r.memberName, r.memberId, r.loanId, r.appId, r.collectorName, r.mobile].some(v => v && v.toLowerCase().includes(q));
+  });
+
+  const totalClosed = filtered.reduce((s, r) => s + Number(r.loanAmount || 0), 0);
+  const csvRows = filtered.map(r => ({ ...r, loanAmount: fmtINR(r.loanAmount), totalPaid: fmtINR(r.totalPaid) }));
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>From</div>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+            style={{ padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, fontSize: 14, background: '#fff' }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>To</div>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)}
+            style={{ padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, fontSize: 14, background: '#fff' }} />
+        </div>
+        <button className="btn sm" style={{ alignSelf: 'flex-end' }} onClick={load}>Apply</button>
+        <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0, alignSelf: 'flex-end' }}
+          placeholder="Search member, loan ID, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <ExportBar count={filtered.length} total={totalClosed} totalLabel="Total Loan Amount Closed"
+        onCSV={() => exportCSV(csvRows, CLOSE_COLS, `closing-report${from ? '-' + from : ''}`)}
+        onPDF={() => printPDF('Loan Closing Report', from && to ? `${from} to ${to}` : 'All Closed Loans', CLOSE_COLS, csvRows,
+          [['Closed Loans', filtered.length], ['Total Amount', fmtINR(totalClosed)]])} />
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading…</p></div> :
+        filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No closed loans found.</p></div> :
+        <div className="panel scroll-x">
+          <table className="dtable">
+            <thead><tr>{CLOSE_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
+            <tbody>{filtered.map((r, i) => (
+              <tr key={i}>
+                <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
+                <td className="mono" style={{ fontSize: 12 }}>{r.appId}</td>
+                <td><b>{r.memberName}</b></td>
+                <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
+                <td className="mono">{r.mobile}</td>
+                <td>{r.collectorName}</td>
+                <td>{r.loanType}</td>
+                <td className="r mono">{fmtINR(r.loanAmount)}</td>
+                <td className="r mono" style={{ color: 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.totalPaid)}</td>
+                <td className="mono" style={{ fontSize: 12 }}>{r.disbursalDate}</td>
+                <td className="mono" style={{ fontSize: 12 }}>{r.closeDate}</td>
+                <td><Pill c="green">{r.status}</Pill></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      }
+    </div>
+  );
+}
+
 const REPORT_TABS = [
   { key: 'summary', label: '📊 Summary' },
   { key: 'daily', label: '📅 Daily' },
@@ -693,6 +784,7 @@ const REPORT_TABS = [
   { key: 'defaulters', label: '⚠ Due & Defaulters' },
   { key: 'paid', label: '✅ Paid Members' },
   { key: 'collector', label: '👤 Collector-wise' },
+  { key: 'closing', label: '🔒 Closing Report' },
 ];
 
 export function Reports() {
@@ -717,6 +809,7 @@ export function Reports() {
       {tab === 'defaulters' && <DefaultersReport />}
       {tab === 'paid' && <PaidMembersReport />}
       {tab === 'collector' && <CollectorWiseReport />}
+      {tab === 'closing' && <ClosingReport />}
     </>
   );
 }

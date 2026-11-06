@@ -42,10 +42,20 @@ export function LoanCollection() {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [closingRows, setClosingRows] = useState([]);
+  const [closingLoading, setClosingLoading] = useState(false);
+  const [mainTab, setMainTab] = useState('loans');
   const activeFilter = searchParams.get('status') || 'All';
   const nav = useNavigate();
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+
   useEffect(() => { api.getApplications({ collectorId: user.id }).then(setApps).finally(() => setLoading(false)); }, []);
+
+  function loadClosing() {
+    setClosingLoading(true);
+    api.getReportClosing({ collectorId: user.id }).then(setClosingRows).catch(() => setClosingRows([])).finally(() => setClosingLoading(false));
+  }
+  useEffect(() => { if (mainTab === 'closing') loadClosing(); }, [mainTab]);
   const counts = {
     total: apps.length,
     draft: apps.filter(a => a.status === 'Draft').length,
@@ -54,8 +64,9 @@ export function LoanCollection() {
     approved: apps.filter(a => a.status === 'Approved').length,
     rejected: apps.filter(a => a.status === 'Rejected').length,
     disbursed: apps.filter(a => a.status === 'Disbursed').length,
+    npa: apps.filter(a => a.status === 'NPA').length,
   };
-  const sc = { Draft:'grey', 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Approved:'green', Rejected:'red', Disbursed:'green' };
+  const sc = { Draft:'grey', 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Approved:'green', Rejected:'red', Disbursed:'green', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
   const filteredApps = activeFilter === 'All' ? apps : apps.filter(a => a.status === activeFilter);
   function setFilter(status) { setSearchParams(status === 'All' ? {} : { status }); }
   if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>;
@@ -67,6 +78,43 @@ export function LoanCollection() {
           <Link to='/app/loan-collection/new-member' className='btn gold'>+ New Application</Link>
         </div>
       </div>
+
+      <div style={{ display:'flex', gap:0, borderBottom:'2px solid var(--line)', marginBottom:20 }}>
+        {[['loans','Loan Applications'],['closing','🔒 Closing Report']].map(([k,l]) => (
+          <button key={k} onClick={() => setMainTab(k)}
+            style={{ padding:'10px 18px', border:0, borderBottom: mainTab===k ? '2px solid var(--g800)' : '2px solid transparent', background:'transparent', fontWeight: mainTab===k ? 700 : 400, cursor:'pointer', fontSize:13, marginBottom:-2 }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === 'closing' && (
+        closingLoading ? <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div> :
+        closingRows.length === 0 ? <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>No closed loans yet.</p></div> :
+        <div className='panel scroll-x'>
+          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--line)', display:'flex', gap:24 }}>
+            <div><div style={{ fontSize:11, color:'var(--muted)' }}>Closed Loans</div><div style={{ fontWeight:700, fontSize:20 }}>{closingRows.length}</div></div>
+            <div><div style={{ fontSize:11, color:'var(--muted)' }}>Total Amount</div><div style={{ fontWeight:700, fontSize:20 }}>&#8377;{closingRows.reduce((s,r)=>s+Number(r.loanAmount||0),0).toLocaleString('en-IN')}</div></div>
+          </div>
+          <table className='dtable'>
+            <thead><tr><th>Loan ID</th><th>Member</th><th>Loan Type</th><th className='r'>Amount</th><th className='r'>Total Paid</th><th>Disbursal</th><th>Closed On</th><th>Status</th></tr></thead>
+            <tbody>{closingRows.map((r,i) => (
+              <tr key={i}>
+                <td className='mono' style={{ fontSize:12 }}>{r.loanId}</td>
+                <td><b>{r.memberName}</b><div className='muted' style={{ fontSize:12 }}>{r.memberId}</div></td>
+                <td>{r.loanType}</td>
+                <td className='r mono'>&#8377;{Number(r.loanAmount).toLocaleString('en-IN')}</td>
+                <td className='r mono' style={{ color:'var(--green-tx)', fontWeight:700 }}>&#8377;{Number(r.totalPaid).toLocaleString('en-IN')}</td>
+                <td className='mono' style={{ fontSize:12 }}>{r.disbursalDate}</td>
+                <td className='mono' style={{ fontSize:12 }}>{r.closeDate}</td>
+                <td><span className='pill green'>{r.status}</span></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+
+      {mainTab === 'loans' && (<>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:14 }}>
         {[['Total','All',counts.total,'#fff'],['Draft','Draft',counts.draft,'var(--soft)'],['Pending','Pending Admin Approval',counts.pending,'var(--yellow-bg)'],['Approved','Approved',counts.approved,'var(--green-bg)']].map(([l,s,v,bg]) => (
           <div key={l} className={'panel pad stat-card' + (activeFilter === s ? ' stat-card-active' : '')} style={{ background:bg }} onClick={() => setFilter(s)} role='button' tabIndex={0} onKeyDown={e => e.key === 'Enter' && setFilter(s)}>
@@ -76,7 +124,7 @@ export function LoanCollection() {
         ))}
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
-        {[['Under Review','Under Review',counts.review,'var(--yellow-bg)'],['Rejected','Rejected',counts.rejected,'var(--red-bg)'],['Disbursed','Disbursed',counts.disbursed,'var(--green-bg)']].map(([l,s,v,bg]) => (
+        {[['Under Review','Under Review',counts.review,'var(--yellow-bg)'],['Rejected','Rejected',counts.rejected,'var(--red-bg)'],['Disbursed','Disbursed',counts.disbursed,'var(--green-bg)'],['NPA','NPA',counts.npa,'var(--red-bg)']].map(([l,s,v,bg]) => (
           <div key={l} className={'panel pad stat-card' + (activeFilter === s ? ' stat-card-active' : '')} style={{ background:bg }} onClick={() => setFilter(s)} role='button' tabIndex={0} onKeyDown={e => e.key === 'Enter' && setFilter(s)}>
             <div className='eyebrow' style={{ fontSize:11 }}>{l}</div>
             <div className='stat-num'>{v}</div>
@@ -96,7 +144,7 @@ export function LoanCollection() {
       ) : (
         <div className='panel scroll-x'>
           <table className='dtable'>
-            <thead><tr><th>App ID</th><th>Member</th><th>Mobile</th><th>Loan Type</th><th className='r'>Amount</th><th>Date</th><th>Status</th><th>Loan ID</th></tr></thead>
+            <thead><tr><th>App ID</th><th>Member</th><th>Mobile</th><th>Loan Type</th><th className='r'>Amount</th><th>Date</th><th>Status</th><th>Loan ID</th><th></th></tr></thead>
             <tbody>{filteredApps.map(a => (
               <tr key={a.appId}>
                 <td className='mono' style={{ fontSize:13 }}>{a.appId}</td>
@@ -107,19 +155,55 @@ export function LoanCollection() {
                 <td className='mono' style={{ fontSize:13 }}>{a.date}</td>
                 <td><span className={'pill ' + (sc[a.status] || 'grey')}>{a.status}</span></td>
                 <td className='mono' style={{ fontSize:13 }}>{a.loanId || '--'}</td>
+                <td>
+                  {a.status === 'Disbursed' && (
+                    <button className='btn sm outline-red' onClick={async () => {
+                      if (!window.confirm('Mark this loan for recovery? Admin will be notified.')) return;
+                      try {
+                        await api.updateApplication(a.appId, { status: 'Recovery', statusHistory: [...(a.statusHistory || []), { status: 'Recovery', date: new Date().toLocaleString(), by: user.name }] });
+                        setApps(prev => prev.map(x => x.appId === a.appId ? { ...x, status: 'Recovery' } : x));
+                      } catch (e) { alert('Error: ' + e.message); }
+                    }}>Recovery</button>
+                  )}
+                </td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       )}
+    </>)}
     </>
   );
 }
 
 /* ===== New Member Registration ===== */
+function ImageUpload({ label, value, onChange, error, required }) {
+  return (
+    <Field label={label} required={required}>
+      {value ? (
+        <div style={{ border:'1px solid var(--g800)', borderRadius:12, padding:'10px 14px', background:'var(--green-bg)' }}>
+          <img src={URL.createObjectURL(value)} alt={label} style={{ width:'100%', maxHeight:120, objectFit:'cover', borderRadius:8, marginBottom:6 }} />
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:13, color:'var(--green-tx)' }}>&#10003; {value.name}</span>
+            <button type='button' style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:13 }} onClick={() => onChange(null)}>Remove</button>
+          </div>
+        </div>
+      ) : (
+        <label style={{ display:'block', border:'1.5px dashed var(--line)', borderRadius:12, padding:14, textAlign:'center', cursor:'pointer', fontSize:13, color:'var(--muted)' }}>
+          + Upload Photo (JPG/PNG, max 5MB)
+          <input type='file' accept='.jpg,.jpeg,.png' style={{ display:'none' }} onChange={e => { const file = e.target.files[0]; if (file) onChange(file); }} />
+        </label>
+      )}
+      {error && <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{error}</span>}
+    </Field>
+  );
+}
+
 export function NewMemberForm() {
   const nav = useNavigate();
   const [f, setF] = useState({ name:'', mobile:'', altMobile:'', dob:'', gender:'', aadhaar:'', pan:'', occupation:'', address:'', village:'', district:'', state:'', pin:'', nomName:'', nomRel:'', nomMobile:'', nomAddress:'' });
+  const [photo, setPhoto] = useState(null);
+  const [shopImage, setShopImage] = useState(null);
   const [err, setErr] = useState({});
   const set = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
@@ -144,7 +228,11 @@ export function NewMemberForm() {
     const errs = validate();
     if (Object.keys(errs).length) { setErr(errs); return; }
     try {
-      const member = await api.createMember({ ...f, pan: f.pan.toUpperCase() });
+      const formData = new FormData();
+      Object.entries({ ...f, pan: f.pan.toUpperCase() }).forEach(([k, v]) => formData.append(k, v));
+      if (photo) formData.append('photo', photo);
+      if (shopImage) formData.append('shopImage', shopImage);
+      const member = await api.createMemberForm(formData);
       nav('/app/loan-collection/apply/' + member.memberId);
     } catch (err) {
       setErr({ aadhaar: err.message });
@@ -169,6 +257,8 @@ export function NewMemberForm() {
             <Field label='Occupation'><Inp value={f.occupation} onChange={set('occupation')} placeholder='e.g. Kirana shop' /></Field>
             <Field label='Aadhaar Number' required><Inp value={f.aadhaar} onChange={set('aadhaar')} placeholder='12 digits' mono /><E k='aadhaar' /></Field>
             <Field label='PAN Number' required><Inp value={f.pan} onChange={set('pan')} placeholder='ABCDE1234F' mono /><E k='pan' /></Field>
+            <ImageUpload label='Person Photo' value={photo} onChange={setPhoto} error={err.photo} />
+            <ImageUpload label='Shop Image' value={shopImage} onChange={setShopImage} error={err.shopImage} />
             <Field label='Address' required><Inp value={f.address} onChange={set('address')} placeholder='House no, street, area' /><E k='address' /></Field>
             <Field label='Village / City'><Inp value={f.village} onChange={set('village')} /></Field>
             <Field label='District'><Inp value={f.district} onChange={set('district')} /></Field>

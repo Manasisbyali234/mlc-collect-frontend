@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 export { LoanApplications, ApplicationDetail } from './LoanApplicationScreens.jsx';
 
@@ -19,6 +19,14 @@ export function Dashboard() {
     api.getApplications().then(setApps).catch(() => {});
   }, []);
 
+  async function handleAutoNpa() {
+    try {
+      const r = await api.autoNpa();
+      alert(r.count > 0 ? `${r.count} loan(s) flagged as NPA: ${r.flagged.join(', ')}` : 'No new NPA accounts found.');
+      api.getDashboard().then(setStats).catch(() => {});
+    } catch (e) { alert('Error: ' + e.message); }
+  }
+
   const kpis = [
     ['Members (CIF)', stats ? stats.totalMembers : '–', 'registered members', '/admin/customers'],
     ['Loan Applications', stats ? stats.totalApplications : '–', 'all time', '/admin/loan-applications'],
@@ -28,13 +36,15 @@ export function Dashboard() {
     ['Total Collected', stats ? '₹' + stats.totalCollected.toLocaleString('en-IN') : '–', 'all collections', '/admin/collections'],
     ['Deposits to verify', stats ? stats.pendingDeposits : '–', 'pending verification', '/admin/deposits'],
     ['Collectors', stats ? stats.totalCollectors : '–', 'active collectors', '/admin/settings'],
+    ['NPA Accounts', stats ? stats.totalNPA : '–', '>10 missed EMIs', '/admin/loan-applications?status=NPA'],
   ];
 
   return (
     <>
       <div className="a-title">
         <div><h1>Organisation dashboard</h1><p>All branches · live data</p></div>
-        <div>
+        <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+          <button className="btn sm outline-red" onClick={handleAutoNpa}>⚑ Auto-flag NPA</button>
           <select className="sel"><option>All branches</option></select>
         </div>
       </div>
@@ -55,7 +65,7 @@ export function Dashboard() {
           <table className="dtable">
             <thead><tr><th>App ID</th><th>Member</th><th>Collector</th><th>Loan Type</th><th className="r">Amount</th><th>Date</th><th>Status</th></tr></thead>
             <tbody>{apps.slice(-10).reverse().map(a => {
-              const sc = { Draft:'grey', 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Approved:'green', Rejected:'red', Disbursed:'green' };
+              const sc = { Draft:'grey', 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Approved:'green', Rejected:'red', Disbursed:'green', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
               return (
                 <tr key={a.appId}>
                   <td className="mono" style={{ fontSize:13 }}>{a.appId}</td>
@@ -118,6 +128,7 @@ export function CustomerProfile() {
   const [members, setMembers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const nav = useNavigate();
   useEffect(() => { api.getMembers().then(setMembers).finally(() => setLoading(false)); }, []);
   const filtered = members.filter(m => {
     const q = search.toLowerCase();
@@ -136,9 +147,9 @@ export function CustomerProfile() {
       ) : (
         <div className="panel scroll-x">
           <table className="dtable">
-            <thead><tr><th>Member ID</th><th>Name</th><th>Mobile</th><th>Aadhaar</th><th>PAN</th><th>Village/City</th><th>District</th></tr></thead>
+            <thead><tr><th>Member ID</th><th>Name</th><th>Mobile</th><th>Aadhaar</th><th>PAN</th><th>Village/City</th><th>District</th><th></th></tr></thead>
             <tbody>{filtered.map(m => (
-              <tr key={m.memberId}>
+              <tr key={m.memberId} style={{ cursor:'pointer' }} onClick={() => nav('/admin/customers/' + m.memberId)}>
                 <td className="mono" style={{ fontSize:13 }}>{m.memberId}</td>
                 <td><b>{m.name}</b></td>
                 <td className="mono">{m.mobile}</td>
@@ -146,6 +157,79 @@ export function CustomerProfile() {
                 <td className="mono">{m.pan}</td>
                 <td>{m.village}</td>
                 <td>{m.district}</td>
+                <td><button className="btn sm" onClick={e => { e.stopPropagation(); nav('/admin/customers/' + m.memberId); }}>View Loans</button></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* =============== Member Loan Detail =============== */
+export function MemberDetail() {
+  const { memberId } = useParams();
+  const [member, setMember] = useState(null);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const nav = useNavigate();
+  const SC = { Draft:'grey', 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Sanctioned:'yellow', Approved:'green', Rejected:'red', Disbursed:'green', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
+
+  useEffect(() => {
+    Promise.all([api.getMember(memberId), api.getMemberLoans(memberId)])
+      .then(([m, d]) => { setMember(m); setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [memberId]);
+
+  if (loading) return <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>;
+  if (!member) return <div><p className="muted">Member not found.</p><button className="btn outline sm" onClick={() => nav('/admin/customers')}>Back</button></div>;
+
+  return (
+    <>
+      <div className="a-title">
+        <div>
+          <h1>{member.name}</h1>
+          <p>{member.memberId} · {member.mobile} · {member.village}{member.district ? ', ' + member.district : ''}</p>
+        </div>
+        <button className="btn outline sm" onClick={() => nav('/admin/customers')}>← Back</button>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 }}>
+        {[
+          ['Total Loans', data.count, 'all time'],
+          ['Total Loan Amount', '₹' + data.totalLoanAmount.toLocaleString('en-IN'), 'sanctioned'],
+          ['Total Paid', '₹' + data.totalPaidAll.toLocaleString('en-IN'), 'collected'],
+          ['Outstanding', '₹' + (data.totalLoanAmount - data.totalPaidAll).toLocaleString('en-IN'), 'pending'],
+        ].map(([label, val, sub]) => (
+          <div key={label} className="panel pad" style={{ textAlign:'center' }}>
+            <div className="eyebrow" style={{ fontSize:11 }}>{label}</div>
+            <div className="mono" style={{ fontSize:26, fontWeight:700, margin:'6px 0 2px' }}>{val}</div>
+            <div className="muted" style={{ fontSize:12 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {data.loans.length === 0 ? (
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">No loans found for this member.</p></div>
+      ) : (
+        <div className="panel scroll-x">
+          <div className="panel-head"><h3>Loan History</h3></div>
+          <table className="dtable">
+            <thead><tr><th>App ID</th><th>Loan ID</th><th>Loan Type</th><th className="r">Amount</th><th className="r">Paid</th><th className="r">Pending</th><th>Date</th><th>Disbursal</th><th>Status</th><th></th></tr></thead>
+            <tbody>{data.loans.map(l => (
+              <tr key={l.appId}>
+                <td className="mono" style={{ fontSize:12 }}>{l.appId}</td>
+                <td className="mono" style={{ fontSize:12 }}>{l.loanId || '–'}</td>
+                <td>{l.loanType}</td>
+                <td className="r mono">₹{l.loanAmount.toLocaleString('en-IN')}</td>
+                <td className="r mono" style={{ color:'var(--green-tx)' }}>₹{l.totalPaid.toLocaleString('en-IN')}</td>
+                <td className="r mono" style={{ color: l.pending > 0 ? 'var(--red-tx)' : 'inherit' }}>₹{l.pending.toLocaleString('en-IN')}</td>
+                <td className="mono" style={{ fontSize:12 }}>{l.date}</td>
+                <td className="mono" style={{ fontSize:12 }}>{l.disbursalDate || '–'}</td>
+                <td><span className={'pill ' + (SC[l.status] || 'grey')}>{l.status}</span></td>
+                <td><Link to={'/admin/loan-applications/' + l.appId} className="btn sm">View</Link></td>
               </tr>
             ))}</tbody>
           </table>
@@ -228,6 +312,7 @@ export function CollectionGrid() {
 /* =============== Deposit verification =============== */
 export function DepositVerification() {
   const [deposits, setDeposits] = useState([]);
+  const [viewPhoto, setViewPhoto] = useState(null);
   useEffect(() => { api.getDeposits().then(setDeposits).catch(() => {}); }, []);
   const pending = deposits.filter(d => d.status === 'To verify').length;
   const mismatches = deposits.filter(d => d.status === 'Mismatch').length;
@@ -245,15 +330,28 @@ export function DepositVerification() {
           <div style={{ padding:32, textAlign:'center' }}><p className="muted">No deposits submitted yet.</p></div>
         ) : (
           <table className="dtable">
-            <thead><tr><th>Collector</th><th>Date</th><th className="r">Amount</th><th>Method</th><th>Reference</th><th>Status</th></tr></thead>
+            <thead><tr><th>Collector</th><th>Collected From</th><th>Date</th><th className="r">Amount</th><th>Method</th><th>Reference</th><th>Location</th><th>Photo</th><th>Status</th></tr></thead>
             <tbody>
               {deposits.map((d) => (
                 <tr key={d.id}>
                   <td><b>{d.collectorName}</b></td>
+                  <td>{d.collectedFrom || '–'}</td>
                   <td className="mono">{d.date}</td>
                   <td className="r mono">₹{Number(d.amount).toLocaleString('en-IN')}</td>
                   <td>{d.method}</td>
                   <td className="mono" style={{ fontSize:13 }}>{d.reference}</td>
+                  <td style={{ fontSize:12 }}>
+                    {d.location ? (
+                      <a href={`https://maps.google.com/?q=${d.location.lat},${d.location.lng}`} target="_blank" rel="noreferrer" style={{ color:'var(--green-tx)' }}>
+                        📍 {d.location.lat}, {d.location.lng}
+                      </a>
+                    ) : '–'}
+                  </td>
+                  <td>
+                    {d.photo ? (
+                      <button className="btn sm" onClick={() => setViewPhoto(d.photo)}>View</button>
+                    ) : '–'}
+                  </td>
                   <td><Pill c={d.status === 'Verified' ? 'green' : d.status === 'Mismatch' ? 'red' : 'yellow'}>{d.status}</Pill></td>
                 </tr>
               ))}
@@ -261,6 +359,14 @@ export function DepositVerification() {
           </table>
         )}
       </div>
+      {viewPhoto && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setViewPhoto(null)}>
+          <div style={{ background:'#fff', borderRadius:16, padding:16, maxWidth:'90vw', maxHeight:'90vh' }} onClick={e => e.stopPropagation()}>
+            <img src={viewPhoto} alt="deposit proof" style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:10, display:'block' }} />
+            <button className="btn outline" style={{ marginTop:12, width:'100%' }} onClick={() => setViewPhoto(null)}>Close</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -371,7 +477,7 @@ export function CollectorTargets() {
   const [users, setUsers] = useState([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ collectorId:'', newApplicants:'', approvals:'', approvedValue:'', collection:'', efficiency:'' });
+  const [form, setForm] = useState({ collectorId:'', newApplicants:'', approvals:'', approvedValue:'', collection:'', efficiency:'', loanAdvance:'', renewalLoans:'' });
   const [saving, setSaving] = useState(false);
 
   function load() {
@@ -382,13 +488,13 @@ export function CollectorTargets() {
 
   function openAdd() {
     setEditing(null);
-    setForm({ collectorId:'', newApplicants:'', approvals:'', approvedValue:'', collection:'', efficiency:'' });
+    setForm({ collectorId:'', newApplicants:'', approvals:'', approvedValue:'', collection:'', efficiency:'', loanAdvance:'', renewalLoans:'' });
     setModal(true);
   }
 
   function openEdit(u, t) {
     setEditing(t);
-    setForm({ collectorId: u.id, newApplicants: t.newApplicants||'', approvals: t.approvals||'', approvedValue: t.approvedValue||'', collection: t.collection||'', efficiency: t.efficiency||'' });
+    setForm({ collectorId: u.id, newApplicants: t.newApplicants||'', approvals: t.approvals||'', approvedValue: t.approvedValue||'', collection: t.collection||'', efficiency: t.efficiency||'', loanAdvance: t.loanAdvance||'', renewalLoans: t.renewalLoans||'' });
     setModal(true);
   }
 
@@ -405,7 +511,7 @@ export function CollectorTargets() {
   }
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
-  const head = ['New applicants', 'Approvals', 'Approved value ₹', 'Collection ₹', 'Efficiency %'];
+  const head = ['New applicants', 'Approvals', 'Approved value ₹', 'Collection ₹', 'Efficiency %', 'Loan Advance', 'Renewal Loans'];
   return (
     <>
       <div className="a-title">
@@ -425,7 +531,7 @@ export function CollectorTargets() {
                   <tr key={u.id}>
                     <td><b>{u.name}</b></td>
                     <td>{u.branch}</td>
-                    {['newApplicants','approvals','approvedValue','collection','efficiency'].map(k => (
+                    {['newApplicants','approvals','approvedValue','collection','efficiency','loanAdvance','renewalLoans'].map(k => (
                       <td key={k} className="r mono">{t[k] || '–'}</td>
                     ))}
                     <td><button className="btn sm" onClick={() => openEdit(u, t)}>Edit</button></td>
@@ -449,7 +555,7 @@ export function CollectorTargets() {
                   {users.map(u => <option key={u.id} value={u.id}>{u.name} — {u.branch}</option>)}
                 </select>
               </div>
-              {[['newApplicants','New applicants'],['approvals','Approvals'],['approvedValue','Approved value (₹)'],['collection','Collection (₹)'],['efficiency','Efficiency (%)']].map(([k, lbl]) => (
+              {[['newApplicants','New applicants'],['approvals','Approvals'],['approvedValue','Approved value (₹)'],['collection','Collection (₹)'],['efficiency','Efficiency (%)'],['loanAdvance','Loan Advance Target'],['renewalLoans','Renewal Loans']].map(([k, lbl]) => (
                 <div key={k}>
                   <label style={{ fontSize:13, fontWeight:600, color:'var(--muted)', display:'block', marginBottom:5 }}>{lbl}</label>
                   <input className="input mono" style={{ padding:'10px 12px' }} value={form[k]} onChange={set(k)} placeholder='0' />
