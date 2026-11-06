@@ -43,7 +43,8 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await api.sendOtp(mobile);
+      const res = await api.sendOtp(mobile);
+      if (res.otp) setOtp(res.otp); // auto-fill dummy OTP
       setStep('otp-verify');
     } catch (err) {
       setError(err.message);
@@ -176,7 +177,7 @@ export default function Login() {
         {mode === 'collector' && step === 'otp-verify' && (
           <form className="login-card" onSubmit={handleVerifyOtp}>
             <h2>Enter OTP</h2>
-            <p className="muted" style={{ fontSize: 14, marginBottom: 18 }}>OTP sent to {mobile}. Check the server console for the code.</p>
+            <p className="muted" style={{ fontSize: 14, marginBottom: 18 }}>OTP sent to {mobile}. Use <strong>123456</strong> as the OTP.</p>
             {errBox}
             <div className="field">
               <label>OTP</label>
