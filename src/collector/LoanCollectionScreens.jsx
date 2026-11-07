@@ -45,11 +45,29 @@ export function LoanCollection() {
   const [closingRows, setClosingRows] = useState([]);
   const [closingLoading, setClosingLoading] = useState(false);
   const [mainTab, setMainTab] = useState('loans');
+  const [loanStats, setLoanStats] = useState({});
   const activeFilter = searchParams.get('status') || 'All';
   const nav = useNavigate();
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
 
-  useEffect(() => { api.getApplications({ collectorId: user.id }).then(setApps).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    api.getApplications({ collectorId: user.id }).then(async (list) => {
+      setApps(list);
+      const disbursed = list.filter(a => a.status === 'Disbursed');
+      const stats = {};
+      await Promise.all(disbursed.map(async a => {
+        try {
+          const data = await api.getApplication(a.appId);
+          const totalDue = Number(data.pending !== undefined ? (data.totalPaid || 0) + (data.pending || 0) : data.loanAmount || 0);
+          const totalPaid = Number(data.totalPaid || 0);
+          const paidPct = totalDue > 0 ? (totalPaid / totalDue) * 100 : 0;
+          console.log('LOAN STAT', a.appId, { totalPaid, totalDue, paidPct });
+          stats[a.appId] = { totalPaid, totalDue, paidPct };
+        } catch (err) { console.error('LOAN STAT ERROR', a.appId, err); }
+      }));
+      setLoanStats(stats);
+    }).finally(() => setLoading(false));
+  }, []);
 
   function loadClosing() {
     setClosingLoading(true);
@@ -155,16 +173,33 @@ export function LoanCollection() {
                 <td className='mono' style={{ fontSize:13 }}>{a.date}</td>
                 <td><span className={'pill ' + (sc[a.status] || 'grey')}>{a.status}</span></td>
                 <td className='mono' style={{ fontSize:13 }}>{a.loanId || '--'}</td>
-                <td>
-                  {a.status === 'Disbursed' && (
-                    <button className='btn sm outline-red' onClick={async () => {
-                      if (!window.confirm('Mark this loan for recovery? Admin will be notified.')) return;
-                      try {
-                        await api.updateApplication(a.appId, { status: 'Recovery', statusHistory: [...(a.statusHistory || []), { status: 'Recovery', date: new Date().toLocaleString(), by: user.name }] });
-                        setApps(prev => prev.map(x => x.appId === a.appId ? { ...x, status: 'Recovery' } : x));
-                      } catch (e) { alert('Error: ' + e.message); }
-                    }}>Recovery</button>
-                  )}
+                <td style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {a.status === 'Disbursed' && (() => {
+                    const s = loanStats[a.appId];
+                    const paidPct = s ? s.paidPct : 0;
+                    return (
+                      <>
+                        {s && (
+                          <span style={{ fontSize:11, color: paidPct >= 50 ? 'var(--green-tx)' : 'var(--muted)', fontWeight:600, alignSelf:'center' }}>
+                            {paidPct.toFixed(0)}% paid
+                          </span>
+                        )}
+                        {paidPct >= 50 && (
+                          <button className='btn sm gold' onClick={() => nav('/app/loan-collection/apply/' + a.memberId)}
+                            title={`${paidPct.toFixed(1)}% repaid — eligible for new loan`}>
+                            + New Loan
+                          </button>
+                        )}
+                        <button className='btn sm outline-red' onClick={async () => {
+                          if (!window.confirm('Mark this loan for recovery? Admin will be notified.')) return;
+                          try {
+                            await api.updateApplication(a.appId, { status: 'Recovery', statusHistory: [...(a.statusHistory || []), { status: 'Recovery', date: new Date().toLocaleString(), by: user.name }] });
+                            setApps(prev => prev.map(x => x.appId === a.appId ? { ...x, status: 'Recovery' } : x));
+                          } catch (e) { alert('Error: ' + e.message); }
+                        }}>Recovery</button>
+                      </>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}</tbody>
@@ -212,7 +247,6 @@ export function NewMemberForm() {
     const e = {};
     if (!f.name.trim()) e.name = 'Required';
     if (!/^\d{10}$/.test(f.mobile)) e.mobile = '10-digit mobile required';
-    if (!f.dob) e.dob = 'Required';
     if (!f.gender) e.gender = 'Required';
     if (!/^\d{12}$/.test(f.aadhaar)) e.aadhaar = '12-digit Aadhaar required';
     if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(f.pan.toUpperCase())) e.pan = 'Valid PAN required (e.g. ABCDE1234F)';
@@ -252,7 +286,7 @@ export function NewMemberForm() {
             <Field label='Member Name' required><Inp value={f.name} onChange={set('name')} placeholder='Full name' /><E k='name' /></Field>
             <Field label='Mobile Number' required><Inp value={f.mobile} onChange={set('mobile')} placeholder='10 digits' mono /><E k='mobile' /></Field>
             <Field label='Alternative Mobile'><Inp value={f.altMobile} onChange={set('altMobile')} placeholder='Optional' mono /></Field>
-            <Field label='Date of Birth' required><Inp type='date' value={f.dob} onChange={set('dob')} /><E k='dob' /></Field>
+            <Field label='Date of Birth'><Inp type='date' value={f.dob} onChange={set('dob')} /></Field>
             <Field label='Gender' required><Sel value={f.gender} onChange={set('gender')}><option value=''>Select</option><option>Male</option><option>Female</option><option>Other</option></Sel><E k='gender' /></Field>
             <Field label='Occupation'><Inp value={f.occupation} onChange={set('occupation')} placeholder='e.g. Kirana shop' /></Field>
             <Field label='Aadhaar Number' required><Inp value={f.aadhaar} onChange={set('aadhaar')} placeholder='12 digits' mono /><E k='aadhaar' /></Field>
@@ -303,10 +337,19 @@ export function LoanApplicationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [appId] = useState(() => 'APP-' + Math.random().toString(36).slice(2,8).toUpperCase());
   const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount:'', tenure:'55', rate:'10', purpose:'' });
+  const DAILY_EMI = 100;
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
   const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
   const [err, setErr] = useState({});
-  const setL = k => e => setLoan(p => ({ ...p, [k]: e.target.value }));
+  const setL = k => e => {
+    const val = e.target.value;
+    if (k === 'amount') {
+      const tenure = val && !isNaN(val) && Number(val) > 0 ? String(Math.ceil(Number(val) / DAILY_EMI)) : loan.tenure;
+      setLoan(p => ({ ...p, amount: val, tenure }));
+    } else {
+      setLoan(p => ({ ...p, [k]: val }));
+    }
+  };
   const setB = k => e => setBank(p => ({ ...p, [k]: e.target.value }));
   const { interest, total, emi } = calcEmi(loan.amount, loan.rate, loan.tenure);
   const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
@@ -408,8 +451,7 @@ export function LoanApplicationForm() {
             <Field label='Loan Type' required><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
             <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} onChange={setL('amount')} placeholder='e.g. 10000' mono /><E k='amount' /></Field>
             <Field label='Tenure (days)' required><Inp value={loan.tenure} onChange={setL('tenure')} mono /><E k='tenure' /></Field>
-            <Field label='Interest Rate (%)'><Inp value={loan.rate} onChange={setL('rate')} mono /></Field>
-            <Field label='EMI / Daily Due (Rs.)'><Inp value={loan.amount ? emi : ''} readOnly mono /></Field>
+            <Field label='Daily EMI (Rs.)'><Inp value={DAILY_EMI} readOnly mono /></Field>
             <Field label='Loan Purpose' required><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /><E k='purpose' /></Field>
             <Field label='Collector'><Inp value={user.name} readOnly /></Field>
             <Field label='Collector ID'><Inp value={user.id} readOnly mono /></Field>

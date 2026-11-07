@@ -85,8 +85,11 @@ export default function BorrowerDashboard() {
         {/* Summary cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: data.penalty > 0 ? 12 : 20 }}>
           <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 16 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Loan Amount</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, marginTop: 6 }}>{fmt(data.loanAmount)}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Amount Received</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, marginTop: 6 }}>{fmt(data.netDisbursalAmount || data.loanAmount)}</div>
+            {data.netDisbursalAmount && data.netDisbursalAmount !== data.loanAmount && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>Sanctioned: {fmt(data.loanAmount)} &minus; Fee: {fmt(Number(data.loanAmount) - Number(data.netDisbursalAmount))}</div>
+            )}
           </div>
           <div style={{ background: 'var(--green-bg)', border: '1px solid var(--line)', borderRadius: 16, padding: 16 }}>
             <div style={{ fontSize: 12, color: 'var(--green-tx)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Paid</div>

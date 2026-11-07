@@ -150,112 +150,154 @@ export function Customer() {
 }
 
 /* ---------- 3. Record collection ---------- */
+const DAILY_EMI = 100;
+
 export function Record() {
+  const [apps, setApps] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState({});
   const [mode, setMode] = useState('Cash');
-  const [amount, setAmount] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [memberSearch, setMemberSearch] = useState('');
-  const [members, setMembers] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [reference, setReference] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const nav = useNavigate();
+  const [search, setSearch] = useState('');
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+  const todayKey = new Date().toLocaleDateString('en-IN');
 
-  useEffect(() => { api.getMembers({ collectorId: user.id }).then(setMembers).catch(() => {}); }, []);
+  function load() {
+    Promise.all([
+      api.getApplications({ collectorId: user.id }),
+      api.getCollections({ collectorId: user.id, date: todayKey }),
+    ]).then(([a, c]) => { setApps(a.filter(x => x.status === 'Disbursed')); setCollections(c); })
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, []);
 
-  const suggestions = memberSearch.length > 0
-    ? members.filter(m => [m.name, m.mobile, m.memberId].some(v => v && v.toLowerCase().includes(memberSearch.toLowerCase()))).slice(0, 6)
-    : [];
+  const todayPaidSet = new Set(collections.map(c => c.appId));
 
-  async function handleSave() {
-    if (!amount || !memberName.trim()) { alert('Enter member name and amount'); return; }
-    setSaving(true);
+  const filtered = apps.filter(a => {
+    const q = search.toLowerCase();
+    return !q || [a.memberName, a.memberId, a.mobile].some(v => v && v.toLowerCase().includes(q));
+  });
+
+  const paidCount = filtered.filter(a => todayPaidSet.has(a.appId)).length;
+  const pendingCount = filtered.length - paidCount;
+
+  async function handleCollect(app) {
+    if (todayPaidSet.has(app.appId)) return;
+    if (mode === 'PhonePe' && !reference.trim()) { alert('Enter UTR / transaction ID for PhonePe'); return; }
+    setSaving(p => ({ ...p, [app.appId]: true }));
     try {
-      await Promise.resolve().then(() => api.saveCollection({
+      const saved = await api.saveCollection({
         collectorId: user.id,
         collectorName: user.name,
-        memberName,
-        amount,
+        memberName: app.memberName,
+        memberId: app.memberId,
+        appId: app.appId,
+        amount: DAILY_EMI,
         mode,
-        reference,
-        date: new Date().toLocaleDateString('en-IN'),
-      }));
-      setSaved(true);
+        reference: mode === 'PhonePe' ? reference : '',
+        date: todayKey,
+        collectionDate: new Date().toISOString().slice(0, 10),
+      });
+      setCollections(p => [...p, saved]);
     } catch (e) { alert('Error: ' + e.message); }
-    finally { setSaving(false); }
+    finally { setSaving(p => ({ ...p, [app.appId]: false })); }
   }
 
-  if (saved) return (
-    <div style={{ maxWidth:500, margin:'60px auto', textAlign:'center' }}>
-      <div style={{ fontSize:64 }}>&#10003;</div>
-      <h2 style={{ marginTop:16 }}>Collection Saved!</h2>
-      <p className='muted'>₹{amount} recorded for {memberName}</p>
-      <button className='btn gold' style={{ marginTop:20 }} onClick={() => { setSaved(false); setAmount(''); setMemberName(''); setMemberSearch(''); setReference(''); }}>Record Another</button>
-      <Link to='/app/collect' className='btn outline' style={{ marginTop:10, display:'block' }}>Back to Collections</Link>
-    </div>
-  );
+  if (loading) return <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>;
 
   return (
     <>
-      <PageHeader title="Record collection" sub={user.name} />
-      <div className="cols">
-        <div>
-          <div className="panel pad" style={{ marginBottom: 18 }}>
-            <div className="lbl">Member name</div>
-            <div style={{ position: 'relative', marginBottom: 14 }}>
-              {memberName ? (
-                <div style={{ display:'flex', alignItems:'center', gap:10, border:'1px solid var(--g800)', borderRadius:14, padding:'10px 14px', background:'var(--green-bg)' }}>
-                  <span style={{ flex:1, fontSize:15, fontWeight:600 }}>{memberName}</span>
-                  <button style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:13, fontWeight:700 }} onClick={() => { setMemberName(''); setMemberSearch(''); }}>✕ Change</button>
-                </div>
-              ) : (
-                <>
-                  <input className="input" value={memberSearch} onChange={e => { setMemberSearch(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="Search member name, mobile, ID…" />
-                  {showSuggestions && suggestions.length > 0 && (
-                    <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#fff', border:'1px solid var(--line)', borderRadius:14, boxShadow:'0 8px 24px rgba(0,0,0,.12)', zIndex:20, overflow:'hidden', marginTop:4 }}>
-                      {suggestions.map(m => (
-                        <div key={m.memberId} style={{ padding:'12px 16px', cursor:'pointer', borderBottom:'1px solid var(--line)', fontSize:14 }}
-                          onMouseDown={() => { setMemberName(m.name); setMemberSearch(''); setShowSuggestions(false); }}>
-                          <b>{m.name}</b>
-                          <span style={{ color:'var(--muted)', fontSize:12, marginLeft:10 }}>{m.memberId} · {m.mobile}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {showSuggestions && memberSearch.length > 0 && suggestions.length === 0 && (
-                    <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#fff', border:'1px solid var(--line)', borderRadius:14, padding:'12px 16px', zIndex:20, marginTop:4, fontSize:14, color:'var(--muted)' }}>No members found</div>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="lbl">Amount received (₹)</div>
-            <div className="amt-input"><span>₹</span><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></div>
-          </div>
+      <PageHeader title="Record Collection" sub={`${user.name} · ${todayKey}`} />
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:18 }}>
+        <div className="panel pad" style={{ textAlign:'center' }}>
+          <div className="eyebrow" style={{ fontSize:11 }}>Total Due Today</div>
+          <div className="mono" style={{ fontSize:28, fontWeight:700 }}>₹{(filtered.length * DAILY_EMI).toLocaleString('en-IN')}</div>
+          <div className="muted" style={{ fontSize:12 }}>{filtered.length} loans × ₹{DAILY_EMI}</div>
         </div>
-        <div>
-          <div className="panel pad" style={{ marginBottom: 18 }}>
-            <div className="lbl">Payment mode</div>
-            <div className="toggle2">
-              {['Cash', 'PhonePe'].map((m) => (
-                <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{m}</button>
-              ))}
-            </div>
-            {mode === 'PhonePe' && (
-              <>
-                <div className="lbl" style={{ marginTop:14 }}>UTR / transaction ID</div>
-                <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. T2610081842" />
-              </>
-            )}
-          </div>
-          <div className="panel pad">
-            <button className="btn block" style={{ padding: 18, fontSize: 18 }} onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : `Save ₹${amount || 0} · ${mode}`}
-            </button>
-          </div>
+        <div className="panel pad" style={{ textAlign:'center', background:'var(--green-bg)' }}>
+          <div className="eyebrow" style={{ fontSize:11 }}>Collected</div>
+          <div className="mono" style={{ fontSize:28, fontWeight:700, color:'var(--green-tx)' }}>₹{(paidCount * DAILY_EMI).toLocaleString('en-IN')}</div>
+          <div className="muted" style={{ fontSize:12 }}>{paidCount} paid</div>
+        </div>
+        <div className="panel pad" style={{ textAlign:'center', background: pendingCount > 0 ? 'var(--yellow-bg)' : 'var(--soft)' }}>
+          <div className="eyebrow" style={{ fontSize:11 }}>Pending</div>
+          <div className="mono" style={{ fontSize:28, fontWeight:700, color: pendingCount > 0 ? 'var(--yellow-tx)' : 'inherit' }}>₹{(pendingCount * DAILY_EMI).toLocaleString('en-IN')}</div>
+          <div className="muted" style={{ fontSize:12 }}>{pendingCount} remaining</div>
         </div>
       </div>
+
+      <div className="panel pad" style={{ marginBottom:18, display:'flex', gap:18, alignItems:'center', flexWrap:'wrap' }}>
+        <div>
+          <div className="lbl" style={{ marginBottom:6 }}>Payment mode</div>
+          <div className="toggle2">
+            {['Cash', 'PhonePe'].map(m => (
+              <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{m}</button>
+            ))}
+          </div>
+        </div>
+        {mode === 'PhonePe' && (
+          <div style={{ flex:1, minWidth:200 }}>
+            <div className="lbl" style={{ marginBottom:6 }}>UTR / Transaction ID</div>
+            <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. T2610081842" />
+          </div>
+        )}
+        <div style={{ flex:1, minWidth:200 }}>
+          <div className="lbl" style={{ marginBottom:6 }}>Search member</div>
+          <input className="input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, mobile, member ID…" />
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}>
+          <p className="muted">{apps.length === 0 ? 'No disbursed loans assigned to you.' : 'No members match your search.'}</p>
+        </div>
+      ) : (
+        <div className="panel scroll-x">
+          <table className="dtable">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Mobile</th>
+                <th>App ID</th>
+                <th className="r">Daily EMI</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(a => {
+                const paid = todayPaidSet.has(a.appId);
+                return (
+                  <tr key={a.appId} style={{ background: paid ? 'var(--green-bg)' : 'transparent' }}>
+                    <td><b>{a.memberName}</b><div className="muted" style={{ fontSize:12 }}>{a.memberId}</div></td>
+                    <td className="mono">{a.mobile}</td>
+                    <td className="mono" style={{ fontSize:12 }}>{a.appId}</td>
+                    <td className="r mono" style={{ fontWeight:700 }}>₹{DAILY_EMI}</td>
+                    <td>
+                      {paid
+                        ? <span className="pill green">✓ Paid</span>
+                        : <span className="pill yellow">Pending</span>}
+                    </td>
+                    <td>
+                      {!paid && (
+                        <button
+                          className="btn sm gold"
+                          onClick={() => handleCollect(a)}
+                          disabled={saving[a.appId]}
+                        >
+                          {saving[a.appId] ? 'Saving…' : `Collect ₹${DAILY_EMI}`}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }
