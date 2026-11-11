@@ -61,6 +61,7 @@ export function Home() {
 /* ---------- 2. Today's collection list ---------- */
 export function Collect() {
   const [collections, setCollections] = useState([]);
+  const [disbursedApps, setDisbursedApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [apps, setApps] = useState([]);
@@ -80,12 +81,18 @@ export function Collect() {
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
   const todayKey = new Date().toLocaleDateString('en-IN');
 
-  function loadCollections() {
-    api.getCollections({ collectorId: user.id })
-      .then(setCollections).finally(() => setLoading(false));
+  function load() {
+    Promise.all([
+      api.getCollections({ collectorId: user.id }),
+      api.getApplications({ collectorId: user.id }),
+    ]).then(([cols, appList]) => {
+      setCollections(cols);
+      setDisbursedApps(appList);
+      setApps(appList.filter(a => ['Disbursed', 'Approved'].includes(a.status)));
+    }).finally(() => setLoading(false));
   }
 
-  useEffect(() => { Promise.resolve().then(loadCollections); }, []);
+  useEffect(() => { load(); }, []);
 
   function capturePayLocation() {
     if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
@@ -105,23 +112,21 @@ export function Collect() {
     setPayPhotoPreview(URL.createObjectURL(file));
   }
 
-  function openModal() {
-    setSelectedApp(null); setAppDetail(null); setAmountPaid(''); setRemarks('');
+  function openModal(preselect) {
+    setSelectedApp(preselect || null);
+    setAppDetail(null); setAmountPaid(''); setRemarks('');
     setPayDate(new Date().toISOString().slice(0, 10)); setFormErr('');
-    setPayPhoto(null); setPayPhotoPreview(null); setPayLocation(null); setAppSearch('');
-    if (apps.length === 0) {
-      api.getApplications({ collectorId: user.id })
-        .then(list => setApps(list.filter(a => a.status === 'Disbursed')))
-        .catch(() => {});
-    }
+    setPayPhoto(null); setPayPhotoPreview(null); setPayLocation(null);
+    setAppSearch(preselect ? preselect.memberName : '');
+    if (preselect) handleSelectApp(preselect.appId, preselect);
     setShowModal(true);
   }
 
   function closeModal() { setShowModal(false); }
 
-  async function handleSelectApp(appId) {
-    const app = apps.find(a => a.appId === appId);
-    setSelectedApp(app || null);
+  async function handleSelectApp(appId, fallback) {
+    const app = apps.find(a => a.appId === appId) || fallback || null;
+    setSelectedApp(app);
     setAppDetail(null);
     if (!app) return;
     setDetailLoading(true);
@@ -168,45 +173,84 @@ export function Collect() {
   const outstanding = appDetail ? Number(appDetail.pending || 0) : 0;
   const loanAmount = appDetail ? Number(appDetail.loanAmount || 0) : 0;
   const totalPaid = appDetail ? Number(appDetail.totalPaid || 0) : 0;
+  const collectedAppIds = new Set(collections.map(c => c.appId));
 
   return (
     <>
       <PageHeader title="Today's collections" sub={new Date().toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })}>
-        <button className="btn gold sm" onClick={openModal}>+ Add Payment</button>
+        <button className="btn gold sm" onClick={() => openModal(null)}>+ Add Payment</button>
       </PageHeader>
+
       {loading ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
-      ) : collections.length === 0 ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}>
-          <p className="muted">No collections recorded yet. Use <b>Record</b> to add entries.</p>
-        </div>
       ) : (
-        <div className="panel scroll-x" style={{ marginBottom: 18 }}>
-          <table className="dtable">
-            <thead><tr><th>Member</th><th>App ID</th><th className="r">Amount</th><th>Mode</th><th>Remarks</th><th>Date</th></tr></thead>
-            <tbody>{collections.map(c => (
-              <tr key={c.id}>
-                <td><b>{c.memberName}</b><div className="muted" style={{ fontSize:12 }}>{c.memberId}</div></td>
-                <td className="mono" style={{ fontSize:12 }}>{c.appId || '–'}</td>
-                <td className="r mono">₹{Number(c.amount).toLocaleString('en-IN')}</td>
-                <td>{c.mode}</td>
-                <td style={{ fontSize:13, color:'var(--muted)' }}>{c.reference || '–'}</td>
-                <td className="mono" style={{ fontSize:13 }}>{c.date}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      )}
-      {collections.length > 0 && (
-        <div className="panel pad">
-          <div className="row between">
-            <div>
-              <div className="eyebrow">Total collected</div>
-              <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px' }}>₹{total.toLocaleString('en-IN')}</div>
+        <>
+          {/* Disbursed loans table */}
+          {disbursedApps.length > 0 && (
+            <div className="panel scroll-x" style={{ marginBottom: 18 }}>
+              <table className="dtable">
+                <thead><tr><th>Member</th><th>App ID</th><th className="r">Loan Amount</th><th>Status</th><th>Today</th><th></th></tr></thead>
+                <tbody>{disbursedApps.map(a => {
+                  const paid = collectedAppIds.has(a.appId);
+                  const canCollect = ['Disbursed', 'Approved'].includes(a.status);
+                  const sc = { Disbursed:'green', Approved:'green', Recovered:'grey', Recovery:'red', NPA:'red', Rejected:'red', Draft:'grey' };
+                  return (
+                    <tr key={a.appId} style={{ background: paid ? 'var(--green-bg)' : 'transparent' }}>
+                      <td><b>{a.memberName}</b><div className="muted" style={{ fontSize:12 }}>{a.memberId}</div></td>
+                      <td className="mono" style={{ fontSize:12 }}>{a.appId}</td>
+                      <td className="r mono">₹{Number(a.loanAmount).toLocaleString('en-IN')}</td>
+                      <td><span className={'pill ' + (sc[a.status] || 'grey')}>{a.status}</span></td>
+                      <td>{canCollect ? (paid ? <span className="pill green">✓ Collected</span> : <span className="pill yellow">Pending</span>) : <span className="pill grey">–</span>}</td>
+                      <td>
+                        {canCollect && !paid && (
+                          <button className="btn sm gold" onClick={() => openModal(a)}>+ Collect</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                </tbody>
+              </table>
             </div>
-            <Link to="/app/deposit" className="btn gold" style={{ padding: '16px 32px', fontSize: 18 }}>Deposit →</Link>
-          </div>
-        </div>
+          )}
+
+          {/* Collections recorded today */}
+          {collections.length > 0 && (
+            <>
+              <div style={{ fontWeight:700, fontSize:14, margin:'18px 0 10px', color:'var(--muted)' }}>Payments Recorded</div>
+              <div className="panel scroll-x" style={{ marginBottom: 18 }}>
+                <table className="dtable">
+                  <thead><tr><th>Member</th><th>App ID</th><th className="r">Amount</th><th>Mode</th><th>Remarks</th><th>Date</th></tr></thead>
+                  <tbody>{collections.map(c => (
+                    <tr key={c.id}>
+                      <td><b>{c.memberName}</b><div className="muted" style={{ fontSize:12 }}>{c.memberId}</div></td>
+                      <td className="mono" style={{ fontSize:12 }}>{c.appId || '–'}</td>
+                      <td className="r mono">₹{Number(c.amount).toLocaleString('en-IN')}</td>
+                      <td>{c.mode}</td>
+                      <td style={{ fontSize:13, color:'var(--muted)' }}>{c.reference || '–'}</td>
+                      <td className="mono" style={{ fontSize:13 }}>{c.date}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              <div className="panel pad">
+                <div className="row between">
+                  <div>
+                    <div className="eyebrow">Total collected</div>
+                    <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px' }}>₹{total.toLocaleString('en-IN')}</div>
+                  </div>
+                  <Link to="/app/deposit" className="btn gold" style={{ padding: '16px 32px', fontSize: 18 }}>Deposit →</Link>
+                </div>
+              </div>
+            </>
+          )}
+
+          {disbursedApps.length === 0 && collections.length === 0 && (
+            <div className="panel pad" style={{ textAlign:'center', padding:48 }}>
+              <p className="muted">No active loans assigned to you yet.</p>
+            </div>
+          )}
+        </>
       )}
 
       {showModal && (
@@ -386,7 +430,7 @@ export function Record() {
     Promise.all([
       api.getApplications({ collectorId: user.id }),
       api.getCollections({ collectorId: user.id, date: todayKey }),
-    ]).then(([a, c]) => { setApps(a.filter(x => x.status === 'Disbursed')); setCollections(c); })
+    ]).then(([a, c]) => { setApps(a.filter(x => ['Disbursed', 'Approved'].includes(x.status))); setCollections(c); })
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
