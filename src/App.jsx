@@ -8,6 +8,7 @@ import {
   Home, Collect, Customer, Record, LoanAccount, Deposit, Targets,
   LoanCollection, NewMemberForm, LoanApplicationForm,
 } from './collector/Screens.jsx';
+import { Defaulters } from './collector/DefaultersScreen.jsx';
 import AdminLayout from './admin/AdminLayout.jsx';
 import {
   Dashboard, Alerts, CustomerProfile, MemberDetail, OpenLoan, CollectionGrid,
@@ -215,6 +216,7 @@ export default function App() {
         <Route path="loan-collection" element={<LoanCollection />} />
         <Route path="loan-collection/new-member" element={<NewMemberForm />} />
         <Route path="loan-collection/apply/:memberId" element={<LoanApplicationForm />} />
+        <Route path="defaulters" element={<Defaulters />} />
       </Route>
 
       <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>

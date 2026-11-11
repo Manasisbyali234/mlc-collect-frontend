@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 const tabs = [
   { to: '/app', label: 'Home', end: true, icon: '🏠' },
   { to: '/app/collect', label: 'Collect', icon: '📋' },
+  { to: '/app/defaulters', label: 'Not Paid', icon: '⚠️' },
   { to: '/app/customers', label: 'Customers', icon: '👥' },
   { to: '/app/deposit', label: 'Deposit', icon: '🏦' },
   { to: '/app/targets', label: 'Targets', icon: '🎯' },

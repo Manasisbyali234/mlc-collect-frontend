@@ -243,6 +243,7 @@ export function NewMemberForm() {
   const [photo, setPhoto] = useState(null);
   const [shopImage, setShopImage] = useState(null);
   const [err, setErr] = useState({});
+  const [submitError, setSubmitError] = useState('');
   const set = k => e => setF(p => ({ ...p, [k]: e.target.value }));
   const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
 
@@ -250,13 +251,7 @@ export function NewMemberForm() {
     const e = {};
     if (!f.name.trim()) e.name = 'Required';
     if (!/^\d{10}$/.test(f.mobile)) e.mobile = '10-digit mobile required';
-    if (!f.gender) e.gender = 'Required';
-    if (!/^\d{12}$/.test(f.aadhaar)) e.aadhaar = '12-digit Aadhaar required';
-    if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(f.pan.toUpperCase())) e.pan = 'Valid PAN required (e.g. ABCDE1234F)';
-    if (!f.address.trim()) e.address = 'Required';
-    if (!f.pin || f.pin.length !== 6) e.pin = '6-digit PIN required';
-    if (!f.nomName.trim()) e.nomName = 'Required';
-    if (!f.nomRel.trim()) e.nomRel = 'Required';
+    if (!shopImage) e.shopImage = 'Shop image is required';
     return e;
   }
 
@@ -264,6 +259,7 @@ export function NewMemberForm() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErr(errs); return; }
+    setSubmitError('');
     try {
       const formData = new FormData();
       Object.entries({ ...f, pan: f.pan.toUpperCase() }).forEach(([k, v]) => formData.append(k, v));
@@ -272,7 +268,7 @@ export function NewMemberForm() {
       const member = await api.createMemberForm(formData);
       nav('/app/loan-collection/apply/' + member.memberId);
     } catch (err) {
-      setErr({ aadhaar: err.message });
+      setSubmitError(err.message || 'Something went wrong. Please try again.');
     }
   }
 
@@ -290,28 +286,33 @@ export function NewMemberForm() {
             <Field label='Mobile Number' required><Inp value={f.mobile} onChange={set('mobile')} placeholder='10 digits' mono /><E k='mobile' /></Field>
             <Field label='Alternative Mobile'><Inp value={f.altMobile} onChange={set('altMobile')} placeholder='Optional' mono /></Field>
             <Field label='Date of Birth'><Inp type='date' value={f.dob} onChange={set('dob')} /></Field>
-            <Field label='Gender' required><Sel value={f.gender} onChange={set('gender')}><option value=''>Select</option><option>Male</option><option>Female</option><option>Other</option></Sel><E k='gender' /></Field>
+            <Field label='Gender'><Sel value={f.gender} onChange={set('gender')}><option value=''>Select</option><option>Male</option><option>Female</option><option>Other</option></Sel></Field>
             <Field label='Occupation'><Inp value={f.occupation} onChange={set('occupation')} placeholder='e.g. Kirana shop' /></Field>
-            <Field label='Aadhaar Number' required><Inp value={f.aadhaar} onChange={set('aadhaar')} placeholder='12 digits' mono /><E k='aadhaar' /></Field>
-            <Field label='PAN Number' required><Inp value={f.pan} onChange={set('pan')} placeholder='ABCDE1234F' mono /><E k='pan' /></Field>
+            <Field label='Aadhaar Number'><Inp value={f.aadhaar} onChange={set('aadhaar')} placeholder='12 digits' mono /></Field>
+            <Field label='PAN Number'><Inp value={f.pan} onChange={set('pan')} placeholder='ABCDE1234F' mono /></Field>
             <ImageUpload label='Person Photo' value={photo} onChange={setPhoto} error={err.photo} />
-            <ImageUpload label='Shop Image' value={shopImage} onChange={setShopImage} error={err.shopImage} />
-            <Field label='Address' required><Inp value={f.address} onChange={set('address')} placeholder='House no, street, area' /><E k='address' /></Field>
+            <ImageUpload label='Shop Image' value={shopImage} onChange={setShopImage} error={err.shopImage} required />
+            <Field label='Address'><Inp value={f.address} onChange={set('address')} placeholder='House no, street, area' /></Field>
             <Field label='Village / City'><Inp value={f.village} onChange={set('village')} /></Field>
             <Field label='District'><Inp value={f.district} onChange={set('district')} /></Field>
             <Field label='State'><Inp value={f.state} onChange={set('state')} /></Field>
-            <Field label='PIN Code' required><Inp value={f.pin} onChange={set('pin')} placeholder='6 digits' mono /><E k='pin' /></Field>
+            <Field label='PIN Code'><Inp value={f.pin} onChange={set('pin')} placeholder='6 digits' mono /></Field>
           </div>
         </div>
         <SectionHead n='2' title='Nominee Details' />
         <div className='panel pad' style={{ marginBottom:24 }}>
           <div className='form-grid fg3' style={{ gap:14 }}>
-            <Field label='Nominee Name' required><Inp value={f.nomName} onChange={set('nomName')} /><E k='nomName' /></Field>
-            <Field label='Relationship' required><Inp value={f.nomRel} onChange={set('nomRel')} placeholder='e.g. Spouse' /><E k='nomRel' /></Field>
+            <Field label='Nominee Name'><Inp value={f.nomName} onChange={set('nomName')} /></Field>
+            <Field label='Relationship'><Inp value={f.nomRel} onChange={set('nomRel')} placeholder='e.g. Spouse' /></Field>
             <Field label='Nominee Mobile'><Inp value={f.nomMobile} onChange={set('nomMobile')} mono /></Field>
             <Field label='Nominee Address'><Inp value={f.nomAddress} onChange={set('nomAddress')} /></Field>
           </div>
         </div>
+        {submitError && (
+          <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-tx)', borderRadius:10, padding:'12px 16px', marginBottom:16, color:'var(--red-tx)', fontSize:14 }}>
+            ⚠️ {submitError}
+          </div>
+        )}
         <div className='row' style={{ gap:12, justifyContent:'flex-end' }}>
           <Link to='/app/loan-collection' className='btn outline'>Cancel</Link>
           <button type='submit' className='btn gold' style={{ padding:'14px 32px' }}>Save Member &amp; Continue</button>
@@ -339,20 +340,13 @@ export function LoanApplicationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [appId] = useState(() => 'APP-' + Math.random().toString(36).slice(2,8).toUpperCase());
-  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount:'', tenure:'55', rate:'10', purpose:'' });
+  const FIXED_AMOUNT = '5000';
+  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: FIXED_AMOUNT, tenure:'55', rate:'10', purpose:'' });
   const DAILY_EMI = 100;
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
   const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
   const [err, setErr] = useState({});
-  const setL = k => e => {
-    const val = e.target.value;
-    if (k === 'amount') {
-      const tenure = val && !isNaN(val) && Number(val) > 0 ? String(Math.ceil(Number(val) / DAILY_EMI)) : loan.tenure;
-      setLoan(p => ({ ...p, amount: val, tenure }));
-    } else {
-      setLoan(p => ({ ...p, [k]: val }));
-    }
-  };
+  const setL = k => e => setLoan(p => ({ ...p, [k]: e.target.value }));
   const setB = k => e => setBank(p => ({ ...p, [k]: e.target.value }));
   const { interest, total, emi } = calcEmi(loan.amount, loan.rate, loan.tenure);
   const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
@@ -372,7 +366,7 @@ export function LoanApplicationForm() {
 
   function validateLoan() {
     const e = {};
-    if (!loan.amount || isNaN(loan.amount) || +loan.amount <= 0) e.amount = 'Valid amount required';
+    if (loan.amount !== FIXED_AMOUNT) e.amount = 'Amount must be Rs.5000';
     if (!loan.tenure || +loan.tenure <= 0) e.tenure = 'Required';
     if (!loan.purpose.trim()) e.purpose = 'Required';
     return e;
@@ -452,8 +446,8 @@ export function LoanApplicationForm() {
             <Field label='Member ID'><Inp value={member.memberId || memberId} readOnly mono /></Field>
             <Field label='Member Name'><Inp value={member.name || ''} readOnly /></Field>
             <Field label='Loan Type' required><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
-            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} onChange={setL('amount')} placeholder='e.g. 10000' mono /><E k='amount' /></Field>
-            <Field label='Tenure (days)' required><Inp value={loan.tenure} onChange={setL('tenure')} mono /><E k='tenure' /></Field>
+            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} readOnly mono /><E k='amount' /></Field>
+            <Field label='Tenure (days)' required><Inp value={loan.tenure} readOnly mono /></Field>
             <Field label='Daily EMI (Rs.)'><Inp value={DAILY_EMI} readOnly mono /></Field>
             <Field label='Loan Purpose' required><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /><E k='purpose' /></Field>
             <Field label='Collector'><Inp value={user.name} readOnly /></Field>

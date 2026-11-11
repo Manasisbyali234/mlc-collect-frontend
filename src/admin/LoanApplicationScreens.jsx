@@ -137,6 +137,7 @@ export function ApplicationDetail() {
   const [loading, setLoading] = useState(true);
   const [remark, setRemark] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [member, setMember] = useState({});
   const [sanctionAmount, setSanctionAmount] = useState('');
   const [serviceCharge, setServiceCharge] = useState('');
   const [sanctionRemark, setSanctionRemark] = useState('');
@@ -153,6 +154,9 @@ export function ApplicationDetail() {
       setApp(d);
       setApprovedTenure(d.tenure || '');
       setConfirmedRate(d.rate || '');
+      setSanctionAmount(d.sanctionAmount || d.loanAmount || '');
+      setServiceCharge(String(calcFee(d.sanctionAmount || d.loanAmount || 0)));
+      if (d.memberId) api.getMember(d.memberId).then(setMember).catch(() => {});
     }).catch(() => setApp(null)).finally(() => setLoading(false));
   }, [appId]);
 
@@ -160,8 +164,6 @@ export function ApplicationDetail() {
   if (!app) return (
     <div><p className='muted'>Application not found.</p><Link to='/admin/loan-applications' className='btn outline sm'>Back</Link></div>
   );
-
-  const member = {};
 
   async function updateStatus(newStatus, extra) {
     const updated = { ...app, status: newStatus, ...extra, statusHistory: [...(app.statusHistory || []), { status: newStatus, date: new Date().toLocaleString(), by: 'Admin' }] };
@@ -209,7 +211,7 @@ export function ApplicationDetail() {
     <>
       <div className='a-title'>
         <div>
-          <div className='row' style={{ gap:12 }}>
+          <div className='app-detail-title-row'>
             <h1>Application {app.appId}</h1>
             <Pill c={SC[app.status] || 'grey'}>{app.status}</Pill>
           </div>
@@ -218,11 +220,27 @@ export function ApplicationDetail() {
         <Link to='/admin/loan-applications' className='btn outline sm'>Back</Link>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:18, alignItems:'start' }}>
+      <div className='app-detail-layout'>
         <div>
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>1 &middot; Member Personal Information</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {(member.photo || member.shopImage) && (
+              <div style={{ marginBottom:12, paddingBottom:12, borderBottom:'1px dashed var(--line)', display:'flex', gap:20, flexWrap:'wrap' }}>
+                {member.photo && (
+                  <div>
+                    <div style={{ fontSize:11, color:'var(--muted)', marginBottom:6 }}>Person Photo</div>
+                    <img src={member.photo} alt='Member' style={{ width:200, height:240, objectFit:'cover', borderRadius:10, border:'1px solid var(--line)' }} />
+                  </div>
+                )}
+                {member.shopImage && (
+                  <div>
+                    <div style={{ fontSize:11, color:'var(--muted)', marginBottom:6 }}>Shop Image</div>
+                    <img src={member.shopImage} alt='Shop' style={{ width:320, height:240, objectFit:'cover', borderRadius:10, border:'1px solid var(--line)' }} />
+                  </div>
+                )}
+              </div>
+            )}
+            <div className='info-grid'>
               {[['Name',app.memberName],['Member ID',app.memberId],['Mobile',app.mobile],['Alt Mobile',member.altMobile],['DOB',member.dob],['Gender',member.gender],['Aadhaar','XXXX XXXX '+(member.aadhaar||'').slice(-4)],['PAN',member.pan],['Occupation',member.occupation],['Address',member.address],['Village',member.village],['District',member.district],['State',member.state],['PIN',member.pin]].filter(([,v])=>v).map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span>{v}</span></div>
               ))}
@@ -230,18 +248,19 @@ export function ApplicationDetail() {
             {member.nomName && (
               <div style={{ marginTop:12, borderTop:'1px dashed var(--line)', paddingTop:10 }}>
                 <div className='eyebrow' style={{ fontSize:11, marginBottom:8 }}>Nominee</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div className='info-grid'>
                   {[['Name',member.nomName],['Relationship',member.nomRel],['Mobile',member.nomMobile],['Address',member.nomAddress]].filter(([,v])=>v).map(([k,v]) => (
                     <div key={k} className='kv'><span className='sans'>{k}</span><span>{v}</span></div>
                   ))}
                 </div>
               </div>
             )}
+
           </div>
 
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>2 &middot; Loan Application Information</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div className='info-grid'>
               {[['Loan Type',app.loanType],['Requested Amount','Rs.'+app.loanAmount],['Tenure',app.tenure+' days'],['Interest Rate',app.rate+'%'],['Interest','Rs.'+app.interest],['Total Repayable','Rs.'+app.total],['EMI','Rs.'+app.emi],['Purpose',app.purpose],['Application Date',app.date]].map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono'>{v}</span></div>
               ))}
@@ -249,7 +268,7 @@ export function ApplicationDetail() {
             {app.pending > 0 && app.penalty > 0 && (
               <div style={{ background:'var(--red-bg)', border:'1.5px solid var(--red-tx)', borderRadius:10, padding:12, marginTop:12 }}>
                 <div className='eyebrow' style={{ fontSize:11, marginBottom:6, color:'var(--red-tx)' }}>⚠ Overdue Penalty (3% per day)</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div className='info-grid'>
                   {[['Pending','Rs.'+app.pending],['Penalty','Rs.'+app.penalty],['Total Payable','Rs.'+app.totalPayable]].map(([k,v]) => (
                     <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono' style={{ color:'var(--red-tx)', fontWeight:700 }}>{v}</span></div>
                   ))}
@@ -259,7 +278,7 @@ export function ApplicationDetail() {
             {app.sanctionAmount && (
               <div style={{ background:'var(--yellow-bg)', border:'1px solid var(--yellow-tx)', borderRadius:10, padding:12, marginTop:12 }}>
                 <div className='eyebrow' style={{ fontSize:11, marginBottom:6 }}>Sanction Details</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div className='info-grid'>
                   {[['Total Amount','Rs.'+Number(app.sanctionAmount).toLocaleString('en-IN')],['Deduction','- Rs.'+(app.processingFee ?? calcFee(app.sanctionAmount)).toLocaleString('en-IN')],['Payable Amount','Rs.'+Number(app.netDisbursalAmount).toLocaleString('en-IN')],['Loan ID',app.loanId]].map(([k,v]) => (
                     <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono' style={k==='Payable Amount'?{fontWeight:700,color:'var(--green-tx)'}:{}}>{v}</span></div>
                   ))}
@@ -269,7 +288,7 @@ export function ApplicationDetail() {
             {app.approvedAmount && (
               <div style={{ background:'var(--green-bg)', borderRadius:10, padding:12, marginTop:12 }}>
                 <div className='eyebrow' style={{ fontSize:11, marginBottom:6 }}>Approved Details</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div className='info-grid'>
                   {[['Sanctioned Amount','Rs.'+Number(app.sanctionAmount).toLocaleString('en-IN')],['Deduction','- Rs.'+(app.processingFee ?? calcFee(app.sanctionAmount)).toLocaleString('en-IN')],['Payable Amount','Rs.'+Number(app.netDisbursalAmount).toLocaleString('en-IN')],['Approved Tenure',app.approvedTenure+' days'],['Confirmed Rate',app.confirmedRate+'%']].map(([k,v]) => (
                     <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono' style={k==='Payable Amount'?{fontWeight:700,color:'var(--green-tx)'}:{}}>{v}</span></div>
                   ))}
@@ -280,7 +299,7 @@ export function ApplicationDetail() {
 
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>3 &middot; Bank Details</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div className='info-grid'>
               {[['Account Holder',app.bank?.holderName],['Bank',app.bank?.bankName],['Branch',app.bank?.branch],['Account No.','XXXX'+(app.bank?.accNo||'').slice(-4)],['IFSC',app.bank?.ifsc],['Account Type',app.bank?.accType],['UPI',app.bank?.upi]].filter(([,v])=>v).map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono'>{v}</span></div>
               ))}
@@ -289,7 +308,7 @@ export function ApplicationDetail() {
 
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>4 &middot; Uploaded Documents</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
+            <div className='docs-grid'>
               {app.docs && Object.entries(app.docs).filter(([,v])=>v).map(([k,v]) => (
                 <div key={k} style={{ border:'1px solid var(--line)', borderRadius:10, padding:12 }}>
                   <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>{k}</div>
@@ -303,7 +322,7 @@ export function ApplicationDetail() {
 
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>5 &middot; Collector Information</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div className='info-grid'>
               {[['Collector Name',app.collectorName],['Collector ID',app.collectorId],['Submitted On',app.date]].map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span>{v}</span></div>
               ))}
@@ -396,7 +415,7 @@ export function ApplicationDetail() {
             {(app.status === 'Pending Admin Approval' || app.status === 'Under Review') && (
               <>
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Sanction Amount (Rs.) *</label>
-                <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} type='number' min='5000' step='5000' value={sanctionAmount} onChange={e => { setSanctionAmount(e.target.value); setServiceCharge(String(calcFee(e.target.value))); }} placeholder={app.loanAmount} />
+                <div className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8, opacity:.7, cursor:'not-allowed' }}>{sanctionAmount || app.loanAmount}</div>
                 {sanctionAmount > 0 && (() => { const fee = serviceCharge !== '' ? Number(serviceCharge) : calcFee(sanctionAmount); const net = Number(sanctionAmount) - fee; return (
                   <>
                     <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Service Charge (Rs.)</label>
