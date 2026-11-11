@@ -407,7 +407,18 @@ export function CollectionGrid() {
 export function DepositVerification() {
   const [deposits, setDeposits] = useState([]);
   const [viewPhoto, setViewPhoto] = useState(null);
-  useEffect(() => { api.getDeposits().then(setDeposits).catch(() => {}); }, []);
+  const [updating, setUpdating] = useState(null);
+
+  function load() { api.getDeposits().then(setDeposits).catch(() => {}); }
+  useEffect(load, []);
+
+  async function handleStatus(id, status) {
+    setUpdating(id);
+    try { await api.updateDeposit(id, { status }); load(); }
+    catch (e) { alert(e.message); }
+    finally { setUpdating(null); }
+  }
+
   const pending = deposits.filter(d => d.status === 'To verify').length;
   const mismatches = deposits.filter(d => d.status === 'Mismatch').length;
   return (
@@ -424,7 +435,7 @@ export function DepositVerification() {
           <div style={{ padding:32, textAlign:'center' }}><p className="muted">No deposits submitted yet.</p></div>
         ) : (
           <table className="dtable">
-            <thead><tr><th>Collector</th><th>Collected From</th><th>Date</th><th className="r">Amount</th><th>Method</th><th>Reference</th><th>Location</th><th>Photo</th><th>Status</th></tr></thead>
+            <thead><tr><th>Collector</th><th>Collected From</th><th>Date</th><th className="r">Amount</th><th>Method</th><th>Reference</th><th>Location</th><th>Photo</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
               {deposits.map((d) => (
                 <tr key={d.id}>
@@ -447,6 +458,14 @@ export function DepositVerification() {
                     ) : '–'}
                   </td>
                   <td><Pill c={d.status === 'Verified' ? 'green' : d.status === 'Mismatch' ? 'red' : 'yellow'}>{d.status}</Pill></td>
+                  <td>
+                    {d.status !== 'Verified' && (
+                      <button className="btn sm" style={{ marginRight: 6 }} disabled={updating === d.id} onClick={() => handleStatus(d.id, 'Verified')}>✓ Verify</button>
+                    )}
+                    {d.status !== 'Mismatch' && (
+                      <button className="btn sm outline-red" disabled={updating === d.id} onClick={() => handleStatus(d.id, 'Mismatch')}>✗ Mismatch</button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

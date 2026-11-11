@@ -65,6 +65,7 @@ export function Collect() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [apps, setApps] = useState([]);
+  const [verifiedDeposits, setVerifiedDeposits] = useState([]);
   const [appSearch, setAppSearch] = useState('');
   const [selectedApp, setSelectedApp] = useState(null);
   const [appDetail, setAppDetail] = useState(null);
@@ -85,10 +86,12 @@ export function Collect() {
     Promise.all([
       api.getCollections({ collectorId: user.id }),
       api.getApplications({ collectorId: user.id }),
-    ]).then(([cols, appList]) => {
+      api.getDeposits(),
+    ]).then(([cols, appList, deps]) => {
       setCollections(cols);
       setDisbursedApps(appList);
       setApps(appList.filter(a => ['Disbursed', 'Approved'].includes(a.status)));
+      setVerifiedDeposits(deps.filter(d => d.status === 'Verified' && (d.collectorId === user.id || d.collectorId === user.mobile || d.collectorName === user.name)));
     }).finally(() => setLoading(false));
   }
 
@@ -169,7 +172,10 @@ export function Collect() {
     finally { setSaving(false); }
   }
 
-  const total = collections.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const totalCollected = collections.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const totalVerifiedDeposits = verifiedDeposits.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  const total = Math.max(0, totalCollected - totalVerifiedDeposits);
+  console.log('[Collect] totalCollected:', totalCollected, 'verifiedDeposits:', verifiedDeposits.length, totalVerifiedDeposits, 'net:', total);
   const outstanding = appDetail ? Number(appDetail.pending || 0) : 0;
   const loanAmount = appDetail ? Number(appDetail.loanAmount || 0) : 0;
   const totalPaid = appDetail ? Number(appDetail.totalPaid || 0) : 0;
@@ -236,8 +242,9 @@ export function Collect() {
               <div className="panel pad">
                 <div className="row between">
                   <div>
-                    <div className="eyebrow">Total collected</div>
+                    <div className="eyebrow">Total collected (undeposited)</div>
                     <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px' }}>₹{total.toLocaleString('en-IN')}</div>
+                    {totalVerifiedDeposits > 0 && <div className="muted" style={{ fontSize: 12 }}>₹{totalVerifiedDeposits.toLocaleString('en-IN')} deposited &amp; verified</div>}
                   </div>
                   <Link to="/app/deposit" className="btn gold" style={{ padding: '16px 32px', fontSize: 18 }}>Deposit →</Link>
                 </div>
@@ -600,7 +607,7 @@ export function LoanAccount() {
 
 /* ---------- 6. Deposit ---------- */
 export function Deposit() {
-  const [how, setHow] = useState('Bank counter');
+  const [how, setHow] = useState('Cash');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [collectedFrom, setCollectedFrom] = useState('');
@@ -631,7 +638,7 @@ export function Deposit() {
   }
 
   async function handleSubmit() {
-    if (!amount || !reference.trim()) { alert('Enter amount and reference'); return; }
+    if (!amount) { alert('Enter amount'); return; }
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -702,12 +709,36 @@ export function Deposit() {
             <div className="lbl">Amount deposited (₹)</div>
             <div className="amt-input"><span>₹</span><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></div>
             <div className="chips" style={{ marginBottom: 18 }}>
-              {['Bank counter', 'CDM', 'UPI to society', 'Handed to office'].map((h) => (
+              {['Cash', 'UPI', 'New Loan Person', 'Handed to Office'].map((h) => (
                 <button key={h} className={`chip ${how === h ? 'active' : ''}`} onClick={() => setHow(h)}>{h}</button>
               ))}
             </div>
-            <div className="lbl">Bank reference / slip number</div>
-            <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. KVGB/HBL/081026/0087" style={{ marginBottom: 18 }} />
+            {how === 'UPI' && (
+              <>
+                <div className="lbl">UPI ID / Transaction ID</div>
+                <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. 9876543210@upi or UTR123456" style={{ marginBottom: 18 }} />
+              </>
+            )}
+            {how === 'New Loan Person' && (
+              <>
+                <div className="lbl">New Loan Person Name</div>
+                <input className="input" value={collectedFrom} onChange={e => setCollectedFrom(e.target.value)} placeholder="Name of new loan person" style={{ marginBottom: 18 }} />
+                <div className="lbl">Reference / Loan ID</div>
+                <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. APP-XXXXXX or Loan ID" style={{ marginBottom: 18 }} />
+              </>
+            )}
+            {how === 'Cash' && (
+              <>
+                <div className="lbl">Cash slip / reference (optional)</div>
+                <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. slip no. or remarks" style={{ marginBottom: 18 }} />
+              </>
+            )}
+            {how === 'Handed to Office' && (
+              <>
+                <div className="lbl">Received by (office person name)</div>
+                <input className="input" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. Manager name or receipt no." style={{ marginBottom: 18 }} />
+              </>
+            )}
             <button className="btn block" style={{ padding: 18, fontSize: 18 }} onClick={handleSubmit} disabled={submitting}>
               {submitting ? 'Submitting…' : 'Submit for verification'}
             </button>
@@ -715,6 +746,105 @@ export function Deposit() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+/* ---------- 6b. Deposit History ---------- */
+const DEP_TYPES = ['All', 'Cash', 'UPI', 'New Loan Person', 'Handed to Office'];
+const DEP_COLOR = { Cash:'green', UPI:'yellow', 'New Loan Person':'grey', 'Handed to Office':'grey' };
+
+export function DepositHistory() {
+  const [deposits, setDeposits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState('All');
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+
+  useEffect(() => {
+    api.getDeposits()
+      .then(all => setDeposits(all.filter(d => d.collectorId === user.id || d.collectorName === user.name)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = typeFilter === 'All' ? deposits : deposits.filter(d => d.method === typeFilter);
+  const totalAmt = filtered.reduce((s, d) => s + Number(d.amount || 0), 0);
+  const counts = DEP_TYPES.slice(1).reduce((acc, t) => { acc[t] = deposits.filter(d => d.method === t).length; return acc; }, {});
+
+  return (
+    <>
+      <PageHeader title="Deposit History" sub="All your submitted deposits by method" />
+
+      {/* Summary cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:18 }}>
+        {DEP_TYPES.slice(1).map(t => {
+          const amt = deposits.filter(d => d.method === t).reduce((s,d) => s + Number(d.amount||0), 0);
+          return (
+            <div key={t} className={'panel pad stat-card' + (typeFilter === t ? ' stat-card-active' : '')}
+              onClick={() => setTypeFilter(typeFilter === t ? 'All' : t)} role='button' tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && setTypeFilter(typeFilter === t ? 'All' : t)}
+              style={{ cursor:'pointer' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <span className={'pill ' + (DEP_COLOR[t] || 'grey')} style={{ fontSize:11 }}>{t}</span>
+                <span style={{ fontSize:20, fontWeight:700 }}>{counts[t] || 0}</span>
+              </div>
+              <div className='mono' style={{ fontSize:16, fontWeight:700 }}>₹{amt.toLocaleString('en-IN')}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{ display:'flex', gap:0, borderBottom:'2px solid var(--line)', marginBottom:18 }}>
+        {DEP_TYPES.map(t => (
+          <button key={t} onClick={() => setTypeFilter(t)}
+            style={{ padding:'9px 16px', border:0, borderBottom: typeFilter===t ? '2px solid var(--g800)' : '2px solid transparent',
+              background:'transparent', fontWeight: typeFilter===t ? 700 : 400, cursor:'pointer', fontSize:13, marginBottom:-2, whiteSpace:'nowrap' }}>
+            {t}{t !== 'All' && counts[t] > 0 ? ` (${counts[t]})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>
+      ) : filtered.length === 0 ? (
+        <div className='panel pad' style={{ textAlign:'center', padding:48 }}>
+          <p className='muted'>No deposits{typeFilter !== 'All' ? ` for ${typeFilter}` : ''} yet.</p>
+        </div>
+      ) : (
+        <>
+          <div className='panel scroll-x'>
+            <table className='dtable'>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Method</th>
+                  <th className='r'>Amount</th>
+                  <th>Collected From</th>
+                  <th>Reference</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((d, i) => (
+                  <tr key={d.id || i}>
+                    <td className='mono' style={{ fontSize:13 }}>{d.date}</td>
+                    <td><span className={'pill ' + (DEP_COLOR[d.method] || 'grey')}>{d.method}</span></td>
+                    <td className='r mono' style={{ fontWeight:700 }}>₹{Number(d.amount).toLocaleString('en-IN')}</td>
+                    <td>{d.collectedFrom || '–'}</td>
+                    <td className='mono' style={{ fontSize:12, color:'var(--muted)' }}>{d.reference || '–'}</td>
+                    <td><span className={'pill ' + (d.status === 'Verified' ? 'green' : d.status === 'Rejected' ? 'red' : 'yellow')}>{d.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className='panel pad' style={{ marginTop:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span className='muted' style={{ fontSize:13 }}>{filtered.length} record{filtered.length !== 1 ? 's' : ''} · {typeFilter}</span>
+            <span className='mono' style={{ fontWeight:700, fontSize:18 }}>Total: ₹{totalAmt.toLocaleString('en-IN')}</span>
+          </div>
+        </>
+      )}
     </>
   );
 }
