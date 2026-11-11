@@ -43,6 +43,11 @@ export const api = {
     return req('GET', `/collections${qs ? '?' + qs : ''}`);
   },
   saveCollection: (data) => req('POST', '/collections', data),
+  saveCollectionForm: async (formData) => {
+    const res = await fetch(BASE + '/collections', { method: 'POST', body: formData });
+    if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || res.statusText); }
+    return res.json();
+  },
 
   getDeposits: () => req('GET', '/deposits'),
   saveDeposit: (data) => req('POST', '/deposits', data),

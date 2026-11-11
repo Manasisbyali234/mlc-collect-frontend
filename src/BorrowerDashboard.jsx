@@ -6,6 +6,54 @@ function fmt(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN');
 }
 
+function PaymentHistory({ collections }) {
+  const [viewPhoto, setViewPhoto] = useState(null);
+  const sorted = [...collections].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return (
+    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontWeight: 700, fontSize: 16 }}>
+        Payment History
+        <span className="muted" style={{ fontSize: 13, fontWeight: 400, marginLeft: 8 }}>({collections.length} payments)</span>
+      </div>
+      {collections.length === 0 ? (
+        <div style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 15 }}>No payments recorded yet.</div>
+      ) : (
+        sorted.map((c, i) => (
+          <div key={c.id || i} style={{ padding: '13px 18px', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{fmt(c.amount)}
+                  <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: c.mode === 'Cash' ? 'var(--green-bg)' : 'var(--yellow-bg)', color: c.mode === 'Cash' ? 'var(--green-tx)' : 'var(--yellow-tx)' }}>{c.mode || 'Cash'}</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>{c.date || '—'}</div>
+                {c.reference && <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--mono)', marginTop: 2 }}>Ref: {c.reference}</div>}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {c.location && (
+                  <a href={`https://maps.google.com/?q=${c.location.lat},${c.location.lng}`} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 12, color: 'var(--green-tx)', textDecoration: 'none', border: '1px solid var(--green-tx)', borderRadius: 8, padding: '3px 8px' }}>📍 Location</a>
+                )}
+                {c.photo && (
+                  <button onClick={() => setViewPhoto(c.photo)}
+                    style={{ fontSize: 12, background: 'none', border: '1px solid var(--line)', borderRadius: 8, padding: '3px 8px', cursor: 'pointer' }}>📷 Photo</button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+      {viewPhoto && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setViewPhoto(null)}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 16, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
+            <img src={viewPhoto} alt="payment proof" style={{ maxWidth: '80vw', maxHeight: '80vh', borderRadius: 10, display: 'block' }} />
+            <button style={{ marginTop: 12, width: '100%', padding: '10px', border: '1px solid var(--line)', borderRadius: 10, cursor: 'pointer', background: '#fff' }} onClick={() => setViewPhoto(null)}>Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BorrowerDashboard() {
   const nav = useNavigate();
   const borrower = JSON.parse(sessionStorage.getItem('mlc_borrower') || 'null');
@@ -154,25 +202,7 @@ export default function BorrowerDashboard() {
         )}
 
         {/* Payment history */}
-        <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontWeight: 700, fontSize: 16 }}>
-            Payment History
-            <span className="muted" style={{ fontSize: 13, fontWeight: 400, marginLeft: 8 }}>({data.collections.length} payments)</span>
-          </div>
-          {data.collections.length === 0 ? (
-            <div style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 15 }}>No payments recorded yet.</div>
-          ) : (
-            [...data.collections].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((c, i) => (
-              <div key={c.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{c.date || '—'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>{c.id}</div>
-                </div>
-                <span className="pill green nodot" style={{ fontFamily: 'var(--mono)', fontSize: 15 }}>{fmt(c.amount)}</span>
-              </div>
-            ))
-          )}
-        </div>
+        <PaymentHistory collections={data.collections} />
       </div>
     </div>
   );

@@ -276,33 +276,127 @@ export function OpenLoan() {
 export function CollectionGrid() {
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [filterCollector, setFilterCollector] = useState('');
+  const [filterMode, setFilterMode] = useState('');
+  const [viewPhoto, setViewPhoto] = useState(null);
+
   useEffect(() => { api.getCollections().then(setCollections).finally(() => setLoading(false)); }, []);
-  const total = collections.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
+  const collectors = [...new Set(collections.map(c => c.collectorName).filter(Boolean))];
+  const modes = [...new Set(collections.map(c => c.mode).filter(Boolean))];
+
+  const filtered = collections.filter(c => {
+    const q = search.toLowerCase();
+    if (q && ![
+      c.memberName, c.memberId, c.appId, c.collectorName, c.reference
+    ].some(v => v && v.toLowerCase().includes(q))) return false;
+    if (filterDate && c.date !== filterDate && c.collectionDate !== filterDate) return false;
+    if (filterCollector && c.collectorName !== filterCollector) return false;
+    if (filterMode && c.mode !== filterMode) return false;
+    return true;
+  });
+
+  const total = filtered.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const cash = filtered.filter(c => c.mode === 'Cash').reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const upi = filtered.filter(c => c.mode !== 'Cash').reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
   return (
     <>
       <div className="a-title">
-        <div><h1>Collections</h1><p>{collections.length} entries · total ₹{total.toLocaleString('en-IN')}</p></div>
+        <div><h1>Daily Collections</h1><p>{filtered.length} entries · ₹{total.toLocaleString('en-IN')} total</p></div>
       </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:18 }}>
+        {[['Total Collected','₹'+total.toLocaleString('en-IN'),filtered.length+' entries'],['Cash','₹'+cash.toLocaleString('en-IN'),filtered.filter(c=>c.mode==='Cash').length+' entries'],['PhonePe / UPI','₹'+upi.toLocaleString('en-IN'),filtered.filter(c=>c.mode!=='Cash').length+' entries']].map(([l,v,s]) => (
+          <div key={l} className="panel pad" style={{ textAlign:'center' }}>
+            <div className="eyebrow" style={{ fontSize:11 }}>{l}</div>
+            <div className="mono" style={{ fontSize:26, fontWeight:700, margin:'4px 0 2px' }}>{v}</div>
+            <div className="muted" style={{ fontSize:12 }}>{s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel pad" style={{ marginBottom:18, display:'flex', gap:12, flexWrap:'wrap', alignItems:'flex-end' }}>
+        <div style={{ flex:'1 1 180px' }}>
+          <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>Search</div>
+          <input className="input" style={{ padding:'9px 12px', fontSize:13 }} placeholder="Member, App ID, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div style={{ flex:'0 0 160px' }}>
+          <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>Date</div>
+          <input className="input" type="date" style={{ padding:'9px 12px', fontSize:13 }} value={filterDate} onChange={e => setFilterDate(e.target.value)} />
+        </div>
+        <div style={{ flex:'0 0 160px' }}>
+          <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>Collector</div>
+          <select className="input" style={{ padding:'9px 12px', fontSize:13 }} value={filterCollector} onChange={e => setFilterCollector(e.target.value)}>
+            <option value=''>All collectors</option>
+            {collectors.map(c => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={{ flex:'0 0 130px' }}>
+          <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>Mode</div>
+          <select className="input" style={{ padding:'9px 12px', fontSize:13 }} value={filterMode} onChange={e => setFilterMode(e.target.value)}>
+            <option value=''>All modes</option>
+            {modes.map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+        {(search || filterDate || filterCollector || filterMode) && (
+          <button className="btn outline sm" style={{ alignSelf:'flex-end' }} onClick={() => { setSearch(''); setFilterDate(''); setFilterCollector(''); setFilterMode(''); }}>Clear</button>
+        )}
+      </div>
+
       {loading ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
-      ) : collections.length === 0 ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">No collections recorded yet.</p></div>
+      ) : filtered.length === 0 ? (
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">{collections.length === 0 ? 'No collections recorded yet.' : 'No entries match your filters.'}</p></div>
       ) : (
         <div className="panel scroll-x">
           <table className="dtable">
-            <thead><tr><th>ID</th><th>Collector</th><th>Member</th><th className="r">Amount</th><th>Mode</th><th>Date</th><th>Reference</th></tr></thead>
-            <tbody>{collections.map(c => (
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>App ID</th>
+                <th>Collector</th>
+                <th className="r">Amount</th>
+                <th>Mode</th>
+                <th>Remarks</th>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Photo</th>
+              </tr>
+            </thead>
+            <tbody>{filtered.map(c => (
               <tr key={c.id}>
-                <td className="mono" style={{ fontSize:13 }}>{c.id}</td>
-                <td>{c.collectorName}</td>
-                <td>{c.memberName}</td>
-                <td className="r mono">₹{Number(c.amount).toLocaleString('en-IN')}</td>
-                <td>{c.mode}</td>
+                <td><b>{c.memberName}</b><div className="muted" style={{ fontSize:12 }}>{c.memberId}</div></td>
+                <td className="mono" style={{ fontSize:12 }}>{c.appId || '–'}</td>
+                <td style={{ fontSize:13 }}>{c.collectorName}</td>
+                <td className="r mono" style={{ fontWeight:700 }}>₹{Number(c.amount).toLocaleString('en-IN')}</td>
+                <td><span className={'pill ' + (c.mode === 'Cash' ? 'green' : 'yellow')}>{c.mode}</span></td>
+                <td style={{ fontSize:13, color:'var(--muted)' }}>{c.reference || '–'}</td>
                 <td className="mono" style={{ fontSize:13 }}>{c.date}</td>
-                <td className="mono" style={{ fontSize:12 }}>{c.reference || '–'}</td>
+                <td style={{ fontSize:12 }}>
+                  {c.location ? (
+                    <a href={`https://maps.google.com/?q=${c.location.lat},${c.location.lng}`} target="_blank" rel="noreferrer" style={{ color:'var(--green-tx)' }}>📍 View</a>
+                  ) : '–'}
+                </td>
+                <td>
+                  {c.photo ? (
+                    <button className="btn sm" onClick={() => setViewPhoto(c.photo)}>View</button>
+                  ) : '–'}
+                </td>
               </tr>
             ))}</tbody>
           </table>
+        </div>
+      )}
+
+      {viewPhoto && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setViewPhoto(null)}>
+          <div style={{ background:'#fff', borderRadius:16, padding:16, maxWidth:'90vw', maxHeight:'90vh' }} onClick={e => e.stopPropagation()}>
+            <img src={viewPhoto} alt="payment proof" style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:10, display:'block' }} />
+            <button className="btn outline" style={{ marginTop:12, width:'100%' }} onClick={() => setViewPhoto(null)}>Close</button>
+          </div>
         </div>
       )}
     </>

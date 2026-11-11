@@ -47,6 +47,7 @@ export function LoanCollection() {
   const [mainTab, setMainTab] = useState('loans');
   const [loanStats, setLoanStats] = useState({});
   const activeFilter = searchParams.get('status') || 'All';
+  const [search, setSearch] = useState('');
   const nav = useNavigate();
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
 
@@ -85,7 +86,8 @@ export function LoanCollection() {
     npa: apps.filter(a => a.status === 'NPA').length,
   };
   const sc = { Draft:'grey', 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Approved:'green', Rejected:'red', Disbursed:'green', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
-  const filteredApps = activeFilter === 'All' ? apps : apps.filter(a => a.status === activeFilter);
+  const filteredApps = (activeFilter === 'All' ? apps : apps.filter(a => a.status === activeFilter))
+    .filter(a => !search || [a.memberName, a.memberId, a.mobile, a.appId].some(v => v && v.toLowerCase().includes(search.toLowerCase())));
   function setFilter(status) { setSearchParams(status === 'All' ? {} : { status }); }
   if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>;
   return (
@@ -149,12 +151,13 @@ export function LoanCollection() {
           </div>
         ))}
       </div>
-      {activeFilter !== 'All' && (
-        <div style={{ marginBottom:14, display:'flex', alignItems:'center', gap:10 }}>
-          <span className='pill yellow'>Filtered: {activeFilter}</span>
-          <button className='btn sm outline' onClick={() => setFilter('All')}>Clear filter</button>
-        </div>
-      )}
+      <div style={{ marginBottom:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <input className='search' style={{ flex:1, minWidth:200, marginBottom:0 }} placeholder='Search name, mobile, App ID…' value={search} onChange={e => setSearch(e.target.value)} />
+        {activeFilter !== 'All' && (
+          <><span className='pill yellow'>Filtered: {activeFilter}</span>
+          <button className='btn sm outline' onClick={() => setFilter('All')}>Clear filter</button></>
+        )}
+      </div>
       {filteredApps.length === 0 ? (
         <div className='panel pad' style={{ textAlign:'center', padding:48 }}>
           <p className='muted'>{apps.length === 0 ? <>No applications yet. Click <b>+ New Application</b> to get started.</> : 'No applications match this filter.'}</p>

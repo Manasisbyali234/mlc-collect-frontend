@@ -62,15 +62,118 @@ export function Home() {
 export function Collect() {
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [apps, setApps] = useState([]);
+  const [appSearch, setAppSearch] = useState('');
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [appDetail, setAppDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [amountPaid, setAmountPaid] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const [formErr, setFormErr] = useState('');
+  const [payPhoto, setPayPhoto] = useState(null);
+  const [payPhotoPreview, setPayPhotoPreview] = useState(null);
+  const [payLocation, setPayLocation] = useState(null);
+  const [locLoading, setLocLoading] = useState(false);
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
-  useEffect(() => {
-    Promise.resolve().then(() => api.getCollections({ collectorId: user.id })
-      .then(setCollections).finally(() => setLoading(false)));
-  }, []);
+  const todayKey = new Date().toLocaleDateString('en-IN');
+
+  function loadCollections() {
+    api.getCollections({ collectorId: user.id })
+      .then(setCollections).finally(() => setLoading(false));
+  }
+
+  useEffect(() => { Promise.resolve().then(loadCollections); }, []);
+
+  function capturePayLocation() {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => { setPayLocation({ lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) }); setLocLoading(false); },
+      () => { alert('Could not get location. Please allow location access.'); setLocLoading(false); }
+    );
+  }
+
+  function handlePayPhoto(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!['image/jpeg','image/png'].includes(file.type)) { alert('Only JPG/PNG allowed'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('Max 5 MB'); return; }
+    setPayPhoto(file);
+    setPayPhotoPreview(URL.createObjectURL(file));
+  }
+
+  function openModal() {
+    setSelectedApp(null); setAppDetail(null); setAmountPaid(''); setRemarks('');
+    setPayDate(new Date().toISOString().slice(0, 10)); setFormErr('');
+    setPayPhoto(null); setPayPhotoPreview(null); setPayLocation(null); setAppSearch('');
+    if (apps.length === 0) {
+      api.getApplications({ collectorId: user.id })
+        .then(list => setApps(list.filter(a => a.status === 'Disbursed')))
+        .catch(() => {});
+    }
+    setShowModal(true);
+  }
+
+  function closeModal() { setShowModal(false); }
+
+  async function handleSelectApp(appId) {
+    const app = apps.find(a => a.appId === appId);
+    setSelectedApp(app || null);
+    setAppDetail(null);
+    if (!app) return;
+    setDetailLoading(true);
+    try {
+      const detail = await api.getApplication(appId);
+      setAppDetail(detail);
+    } catch (e) { setAppDetail(null); }
+    finally { setDetailLoading(false); }
+  }
+
+  async function handleSave() {
+    setFormErr('');
+    if (!selectedApp) { setFormErr('Please select a customer.'); return; }
+    const amt = Number(amountPaid);
+    if (!amt || amt <= 0) { setFormErr('Enter a valid payment amount.'); return; }
+    const outstanding = appDetail ? Number(appDetail.pending || 0) : 0;
+    if (outstanding > 0 && amt > outstanding) {
+      setFormErr(`Amount cannot exceed outstanding balance of ₹${outstanding.toLocaleString('en-IN')}.`);
+      return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('collectorId', user.id);
+      fd.append('collectorName', user.name);
+      fd.append('memberName', selectedApp.memberName);
+      fd.append('memberId', selectedApp.memberId);
+      fd.append('appId', selectedApp.appId);
+      fd.append('amount', amt);
+      fd.append('mode', 'Cash');
+      fd.append('reference', remarks);
+      fd.append('date', todayKey);
+      fd.append('collectionDate', payDate);
+      if (payLocation) fd.append('location', JSON.stringify(payLocation));
+      if (payPhoto) fd.append('photo', payPhoto);
+      const saved = await api.saveCollectionForm(fd);
+      setCollections(p => [...p, saved]);
+      closeModal();
+    } catch (e) { setFormErr('Error: ' + e.message); }
+    finally { setSaving(false); }
+  }
+
   const total = collections.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const outstanding = appDetail ? Number(appDetail.pending || 0) : 0;
+  const loanAmount = appDetail ? Number(appDetail.loanAmount || 0) : 0;
+  const totalPaid = appDetail ? Number(appDetail.totalPaid || 0) : 0;
+
   return (
     <>
-      <PageHeader title="Today's collections" sub={new Date().toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })} />
+      <PageHeader title="Today's collections" sub={new Date().toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })}>
+        <button className="btn gold sm" onClick={openModal}>+ Add Payment</button>
+      </PageHeader>
       {loading ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
       ) : collections.length === 0 ? (
@@ -80,13 +183,14 @@ export function Collect() {
       ) : (
         <div className="panel scroll-x" style={{ marginBottom: 18 }}>
           <table className="dtable">
-            <thead><tr><th>Member</th><th className="r">Amount</th><th>Mode</th><th>Reference</th><th>Date</th></tr></thead>
+            <thead><tr><th>Member</th><th>App ID</th><th className="r">Amount</th><th>Mode</th><th>Remarks</th><th>Date</th></tr></thead>
             <tbody>{collections.map(c => (
               <tr key={c.id}>
-                <td><b>{c.memberName}</b></td>
+                <td><b>{c.memberName}</b><div className="muted" style={{ fontSize:12 }}>{c.memberId}</div></td>
+                <td className="mono" style={{ fontSize:12 }}>{c.appId || '–'}</td>
                 <td className="r mono">₹{Number(c.amount).toLocaleString('en-IN')}</td>
                 <td>{c.mode}</td>
-                <td className="mono" style={{ fontSize:12 }}>{c.reference || '–'}</td>
+                <td style={{ fontSize:13, color:'var(--muted)' }}>{c.reference || '–'}</td>
                 <td className="mono" style={{ fontSize:13 }}>{c.date}</td>
               </tr>
             ))}</tbody>
@@ -104,6 +208,120 @@ export function Collect() {
           </div>
         </div>
       )}
+
+      {showModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={closeModal}>
+          <div style={{ background:'#fff', borderRadius:20, padding:28, width:'100%', maxWidth:520, maxHeight:'90vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <h3 style={{ margin:0, fontSize:20, fontWeight:800 }}>Add Payment</h3>
+              <button onClick={closeModal} style={{ border:0, background:'none', fontSize:22, cursor:'pointer', color:'var(--muted)', lineHeight:1 }}>✕</button>
+            </div>
+
+            <div style={{ display:'grid', gap:14 }}>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Selected Customer <span style={{ color:'var(--red-tx)' }}>*</span></label>
+                <input className="input" style={{ padding:'10px 12px', fontSize:14, marginBottom:6 }} placeholder="Search customer name…" value={appSearch} onChange={e => { setAppSearch(e.target.value); setSelectedApp(null); setAppDetail(null); }} />
+                {appSearch && (
+                  <div style={{ border:'1px solid var(--line)', borderRadius:10, maxHeight:180, overflowY:'auto', background:'#fff' }}>
+                    {apps.filter(a => a.memberName.toLowerCase().includes(appSearch.toLowerCase())).map(a => (
+                      <div key={a.appId} style={{ padding:'9px 14px', cursor:'pointer', borderBottom:'1px solid var(--line)', fontSize:14 }}
+                        onClick={() => { setAppSearch(a.memberName); handleSelectApp(a.appId); }}>
+                        <b>{a.memberName}</b> <span style={{ color:'var(--muted)', fontSize:12 }}>· {a.appId}</span>
+                      </div>
+                    ))}
+                    {apps.filter(a => a.memberName.toLowerCase().includes(appSearch.toLowerCase())).length === 0 && (
+                      <div style={{ padding:'9px 14px', color:'var(--muted)', fontSize:13 }}>No match</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {detailLoading && <p className="muted" style={{ fontSize:13, margin:0 }}>Loading loan details…</p>}
+
+              {appDetail && (
+                <div style={{ background:'var(--soft)', borderRadius:14, padding:'14px 16px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.08em' }}>Loan Amount</div>
+                    <div className="mono" style={{ fontWeight:700, fontSize:16, marginTop:3 }}>₹{loanAmount.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.08em' }}>Total Paid</div>
+                    <div className="mono" style={{ fontWeight:700, fontSize:16, marginTop:3, color:'var(--green-tx)' }}>₹{totalPaid.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.08em' }}>Outstanding</div>
+                    <div className="mono" style={{ fontWeight:700, fontSize:16, marginTop:3, color: outstanding > 0 ? 'var(--red-tx)' : 'var(--green-tx)' }}>₹{outstanding.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+              )}
+
+              {selectedApp && (
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Customer Name</label>
+                  <input className="input ro" style={{ padding:'10px 12px', fontSize:14 }} value={selectedApp.memberName} readOnly />
+                </div>
+              )}
+
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Date</label>
+                <input className="input" type="date" style={{ padding:'10px 12px', fontSize:14 }} value={payDate} onChange={e => setPayDate(e.target.value)} />
+              </div>
+
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Amount Paid (₹) <span style={{ color:'var(--red-tx)' }}>*</span></label>
+                <input className="input mono" style={{ padding:'10px 12px', fontSize:14 }} type="number" min="1"
+                  value={amountPaid} onChange={e => setAmountPaid(e.target.value)}
+                  placeholder={outstanding > 0 ? `Max ₹${outstanding.toLocaleString('en-IN')}` : 'Enter amount'} />
+              </div>
+
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Remarks (Optional)</label>
+                <input className="input" style={{ padding:'10px 12px', fontSize:14 }} value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="e.g. Cash collected at door" />
+              </div>
+
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Live Location</label>
+                {payLocation ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:10, border:'1px solid var(--g800)', borderRadius:12, padding:'10px 14px', background:'var(--green-bg)' }}>
+                    <span style={{ fontSize:13, flex:1 }}>📍 {payLocation.lat}, {payLocation.lng}</span>
+                    <button type='button' style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:12 }} onClick={() => setPayLocation(null)}>✕</button>
+                  </div>
+                ) : (
+                  <button type='button' className="btn outline" style={{ width:'100%' }} onClick={capturePayLocation} disabled={locLoading}>
+                    {locLoading ? 'Getting location…' : '📍 Capture Live Location'}
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Photo Proof</label>
+                {payPhotoPreview ? (
+                  <div>
+                    <img src={payPhotoPreview} alt="proof" style={{ width:'100%', maxHeight:160, objectFit:'cover', borderRadius:12, border:'1px solid var(--line)' }} />
+                    <button type='button' style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:13, marginTop:6 }} onClick={() => { setPayPhoto(null); setPayPhotoPreview(null); }}>✕ Remove photo</button>
+                  </div>
+                ) : (
+                  <label style={{ display:'block', border:'1.5px dashed var(--line)', borderRadius:12, padding:14, textAlign:'center', cursor:'pointer', fontSize:13, color:'var(--muted)' }}>
+                    📷 Take / Upload Photo (JPG/PNG, max 5MB)
+                    <input type='file' accept='image/jpeg,image/png' capture='environment' style={{ display:'none' }} onChange={handlePayPhoto} />
+                  </label>
+                )}
+              </div>
+
+              {formErr && (
+                <div style={{ background:'var(--red-bg)', color:'var(--red-tx)', borderRadius:10, padding:'10px 14px', fontSize:13, fontWeight:600 }}>{formErr}</div>
+              )}
+            </div>
+
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:22 }}>
+              <button className="btn outline" onClick={closeModal}>Cancel</button>
+              <button className="btn gold" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -113,6 +331,7 @@ export function Customer() {
   const [members, setMembers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
   useEffect(() => { Promise.resolve().then(() => api.getMembers({ collectorId: user.id }).then(setMembers).finally(() => setLoading(false))); }, []);
   const filtered = members.filter(m => {
     const q = search.toLowerCase();
@@ -306,6 +525,7 @@ export function Record() {
 export function LoanAccount() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
   useEffect(() => { Promise.resolve().then(() => api.getLoanAccounts({ collectorId: user.id }).then(setAccounts).finally(() => setLoading(false))); }, []);
   return (
     <>
