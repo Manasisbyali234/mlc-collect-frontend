@@ -208,9 +208,9 @@ export function CustomerProfile() {
       <div className="a-title">
         <div><h1>Customers (CIF)</h1><p>{members.length} registered members</p></div>
       </div>
-      <input className="search" style={{ marginBottom: 16 }} placeholder="Search name, mobile, member ID, Aadhaar…" value={search} onChange={e => setSearch(e.target.value)} />
+      <input className="search" style={{ marginBottom: 16 }} placeholder="Search name, mobile, member ID, Aadhaar..." value={search} onChange={e => setSearch(e.target.value)} />
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : filtered.length === 0 ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">{search ? 'No members match your search.' : 'No members registered yet.'}</p></div>
       ) : (
@@ -252,7 +252,7 @@ export function MemberDetail() {
       .finally(() => setLoading(false));
   }, [memberId]);
 
-  if (loading) return <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>;
+  if (loading) return <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>;
   if (!member) return <div><p className="muted">Member not found.</p><button className="btn outline sm" onClick={() => nav('/admin/customers')}>Back</button></div>;
 
   return (
@@ -317,7 +317,7 @@ export function OpenLoan() {
     <>
       <div className="a-title"><div><h1>Loan accounts</h1><p>{accounts.length} total loan accounts</p></div></div>
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : accounts.length === 0 ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">No loan accounts yet. Approve and disburse applications to create loan accounts.</p></div>
       ) : (
@@ -399,7 +399,7 @@ export function CollectionGrid() {
       <div className="panel pad" style={{ marginBottom:18, display:'flex', gap:12, flexWrap:'wrap', alignItems:'flex-end' }}>
         <div style={{ flex:'1 1 180px' }}>
           <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>Search</div>
-          <input className="input" style={{ padding:'9px 12px', fontSize:13 }} placeholder="Member, App ID, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input" style={{ padding:'9px 12px', fontSize:13 }} placeholder="Member, App ID, collector..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div style={{ flex:'0 0 160px' }}>
           <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>Date</div>
@@ -425,7 +425,7 @@ export function CollectionGrid() {
       </div>
 
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : filtered.length === 0 ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">{collections.length === 0 ? 'No collections recorded yet.' : 'No entries match your filters.'}</p></div>
       ) : (
@@ -653,7 +653,7 @@ export function Settings() {
             </div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:20 }}>
               <button className="btn outline" onClick={() => setModal(false)}>Cancel</button>
-              <button className="btn gold" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button className="btn gold" onClick={handleSave} disabled={saving}>{saving ? 'Saving' : 'Save'}</button>
             </div>
           </div>
         </div>
@@ -677,9 +677,9 @@ export function MissedEmi() {
       <div className="a-title">
         <div><h1>⚠️ Missed EMI</h1><p>Borrowers who have not paid on time &middot; {rows.length} accounts</p></div>
       </div>
-      <input className="search" style={{ marginBottom:16 }} placeholder="Search name, ID, mobile, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+      <input className="search" style={{ marginBottom:16 }} placeholder="Search name, ID, mobile, collector..." value={search} onChange={e => setSearch(e.target.value)} />
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : filtered.length === 0 ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">{rows.length === 0 ? 'No missed EMIs found.' : 'No results match your search.'}</p></div>
       ) : (
@@ -798,7 +798,7 @@ export function CollectorTargets() {
             </div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:20 }}>
               <button className="btn outline" onClick={() => setModal(false)}>Cancel</button>
-              <button className="btn gold" onClick={handleSave} disabled={saving || !form.collectorId}>{saving ? 'Saving…' : 'Save'}</button>
+              <button className="btn gold" onClick={handleSave} disabled={saving || !form.collectorId}>{saving ? 'Saving' : 'Save'}</button>
             </div>
           </div>
         </div>

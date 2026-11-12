@@ -29,7 +29,7 @@ export function Defaulters() {
 
       {loading ? (
         <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}>
-          <p className="muted">Loading…</p>
+          <p className="muted">Loading</p>
         </div>
       ) : defaulters.length === 0 ? (
         <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}>

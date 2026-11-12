@@ -51,7 +51,7 @@ export default function BorrowerLogin() {
             <input className="input mono" value={mobile} onChange={e => setMobile(e.target.value)} placeholder="e.g. 99001 23456" required />
           </div>
           <button className="btn block" style={{ padding: 22, fontSize: 18 }} disabled={loading}>
-            {loading ? 'Signing in…' : 'View My Loan'}
+            {loading ? 'Signing in...' : 'View My Loan'}
           </button>
         </form>
         <div className="powered">Powered by Crinsun Technologies</div>

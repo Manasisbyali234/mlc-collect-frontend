@@ -91,7 +91,7 @@ export function LoanApplications() {
     const ms = !q || [a.memberName, a.memberId, a.appId, a.mobile, a.collectorName].some(v => v && v.toLowerCase().includes(q));
     return ms && (sf === 'All' || a.status === sf);
   });
-  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>;
+  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>;
   return (
     <>
       <div className='a-title'>
@@ -163,7 +163,7 @@ export function ApplicationDetail() {
     }).catch(() => setApp(null)).finally(() => setLoading(false));
   }, [appId]);
 
-  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>;
+  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>;
   if (!app) return (
     <div><p className='muted'>Application not found.</p><Link to='/admin/loan-applications' className='btn outline sm'>Back</Link></div>
   );

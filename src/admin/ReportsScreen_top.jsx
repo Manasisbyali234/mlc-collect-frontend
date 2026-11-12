@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 import * as XLSX from 'xlsx';
 
@@ -102,7 +102,7 @@ function CollectorGrouped({ rows, cols, renderRow, amountKey }) {
             <div onClick={() => setOpen(o => ({ ...o, [name]: !isOpen }))}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', cursor: 'pointer', background: 'var(--g50, #f4faf6)', borderBottom: isOpen ? '1px solid var(--line)' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 15, fontWeight: 700 }}>ðŸ‘¤ {name}</span>
+                <span style={{ fontSize: 15, fontWeight: 700 }}> {name}</span>
                 <span style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--line)', borderRadius: 20, padding: '2px 10px' }}>{grp.length} records</span>
                 {total !== null && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--green-tx)' }}>{fmtINR(total)}</span>}
               </div>
@@ -141,7 +141,7 @@ function ExportBar({ onCSV, onPDF, count, total, totalLabel }) {
         {totalLabel && <div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{totalLabel}</div><div style={{ fontWeight: 700, fontSize: 20 }}>{fmtINR(total)}</div></div>}
       </div>
       <button className="btn sm" onClick={onCSV}>â¬‡ CSV</button>
-      <button className="btn sm outline" onClick={onPDF}>ðŸ–¨ PDF / Print</button>
+      <button className="btn sm outline" onClick={onPDF}> PDF / Print</button>
     </div>
   );
 }
@@ -152,7 +152,7 @@ function ExportBar({ onCSV, onPDF, count, total, totalLabel }) {
 function ReportSummary() {
   const [data, setData] = useState(null);
   useEffect(() => { api.getReportSummary().then(setData).catch(() => {}); }, []);
-  if (!data) return <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div>;
+  if (!data) return <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div>;
   const cards = [
     ['Total Applications', fmtNum(data.totalApplications), 'all submitted', '#1f7a45'],
     ['Sanctioned', fmtNum(data.totalSanctioned), 'sanctioned/approved/disbursed', '#D9A02E'],
@@ -246,8 +246,8 @@ function DailyReport() {
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           style={{ padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, fontSize: 14, background: '#fff' }} />
         <input className="search" style={{ flex: 1, minWidth: 220, marginBottom: 0 }}
-          placeholder="Search member, loan ID, collectorâ€¦" value={search} onChange={e => setSearch(e.target.value)} />
-        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>
+          placeholder="Search member, loan ID, collector" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}> Collector-wise</button>
       </div>
       <ExportBar
         count={filtered.length}
@@ -257,7 +257,7 @@ function DailyReport() {
         onPDF={() => printPDF('Daily Collection Report', `Date: ${date}`, DAILY_COLS, csvRows,
           [['Date', date], ['Records', filtered.length], ['Collected Today', fmtINR(totalPaidToday)]])}
       />
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> :
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records for this date.</p></div> :
         grouped ? <CollectorGrouped rows={filtered} cols={DAILY_COLS} renderRow={renderDailyRow} amountKey="paidToday" /> :
         <div className="panel scroll-x">
@@ -327,7 +327,7 @@ function WeeklyReport() {
         <span style={{ fontSize: 13, fontWeight: 600 }}>{range.from} â†’ {range.to}</span>
       </div>
 
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> : !data ? null : (
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> : !data ? null : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
             {summaryCards.map(([label, value]) => (
@@ -342,7 +342,7 @@ function WeeklyReport() {
                 {l}
               </button>
             ))}
-            {subTab !== 'summary' && <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ marginLeft: 'auto' }} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>}
+            {subTab !== 'summary' && <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ marginLeft: 'auto' }} onClick={() => setGrouped(g => !g)}> Collector-wise</button>}
           </div>
 
           {subTab === 'summary' && (
@@ -446,7 +446,7 @@ function MonthlyReport() {
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>{data ? `${data.from} â†’ ${data.to}` : ''}</span>
       </div>
 
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> : !data ? null : (
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> : !data ? null : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
             {overviewCards.map(([label, value]) => (
@@ -461,7 +461,7 @@ function MonthlyReport() {
                 {l}
               </button>
             ))}
-            {subTab === 'history' && <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ marginLeft: 'auto' }} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>}
+            {subTab === 'history' && <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ marginLeft: 'auto' }} onClick={() => setGrouped(g => !g)}> Collector-wise</button>}
           </div>
 
           {subTab === 'performance' && (
@@ -571,13 +571,13 @@ function DefaultersReport() {
         </select>
         <button className="btn sm" style={{ alignSelf: 'flex-end' }} onClick={load}>Apply Filters</button>
         <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0, alignSelf: 'flex-end' }}
-          placeholder="Search member, loan IDâ€¦" value={search} onChange={e => setSearch(e.target.value)} />
-        <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ alignSelf: 'flex-end' }} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>
+          placeholder="Search member, loan ID" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ alignSelf: 'flex-end' }} onClick={() => setGrouped(g => !g)}> Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalPending} totalLabel="Total Pending"
         onCSV={() => exportCSV(csvRows, DEF_COLS, `defaulters-report`)}
         onPDF={() => printPDF('Due & Defaulter Report', from && to ? `${from} to ${to}` : 'All Active Loans', DEF_COLS, csvRows, [['Total Records', filtered.length], ['Total Pending', fmtINR(totalPending)]])} />
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> :
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records found.</p></div> :
         grouped ? <CollectorGrouped rows={filtered} cols={DEF_COLS} renderRow={renderDefRow} amountKey="pendingAmount" /> :
         <div className="panel scroll-x">
@@ -652,13 +652,13 @@ function PaidMembersReport() {
           ))}
         </div>
         <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}
-          placeholder="Search member, loan IDâ€¦" value={search} onChange={e => setSearch(e.target.value)} />
-        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>
+          placeholder="Search member, loan ID" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}> Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalPaid} totalLabel="Total Collected"
         onCSV={() => exportCSV(csvRows, PAID_COLS, `paid-members-report`)}
         onPDF={() => printPDF('Paid Members Report', category === 'all' ? 'All Paid Members' : category === 'fullypaid' ? 'Fully Paid' : 'Partially Paid', PAID_COLS, csvRows, [['Records', filtered.length], ['Total Collected', fmtINR(totalPaid)]])} />
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> :
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records found.</p></div> :
         grouped ? <CollectorGrouped rows={filtered} cols={PAID_COLS} renderRow={renderPaidRow} amountKey="totalPaid" /> :
         <div className="panel scroll-x">
@@ -722,7 +722,7 @@ function CollectorWiseReport() {
       <ExportBar count={rows.length}
         onCSV={() => exportCSV(csvRows, CW_COLS, `collector-wise-report`)}
         onPDF={() => printPDF('Collector-wise Performance Report', from && to ? `${from} to ${to}` : 'All Time', CW_COLS, csvRows, [])} />
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> :
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> :
         rows.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No collectors found.</p></div> :
         <div className="panel scroll-x">
           <table className="dtable">
@@ -830,14 +830,14 @@ function ClosingReport() {
         </div>
         <button className="btn sm" style={{ alignSelf: 'flex-end' }} onClick={load}>Apply</button>
         <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0, alignSelf: 'flex-end' }}
-          placeholder="Search member, loan ID, collectorâ€¦" value={search} onChange={e => setSearch(e.target.value)} />
-        <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ alignSelf: 'flex-end' }} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>
+          placeholder="Search member, loan ID, collector" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ alignSelf: 'flex-end' }} onClick={() => setGrouped(g => !g)}> Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalClosed} totalLabel="Total Loan Amount Closed"
         onCSV={() => exportCSV(csvRows, CLOSE_COLS, `closing-report${from ? '-' + from : ''}`)}
         onPDF={() => printPDF('Loan Closing Report', from && to ? `${from} to ${to}` : 'All Closed Loans', CLOSE_COLS, csvRows,
           [['Closed Loans', filtered.length], ['Total Amount', fmtINR(totalClosed)]])} />
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> :
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No closed loans found.</p></div> :
         grouped ? <CollectorGrouped rows={filtered} cols={CLOSE_COLS} renderRow={renderCloseRow} amountKey="loanAmount" /> :
         <div className="panel scroll-x">
@@ -913,14 +913,14 @@ function LoanDetailsReport() {
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="search" style={{ flex: 1, minWidth: 220, marginBottom: 0 }}
-          placeholder="Search member, loan ID, collectorâ€¦" value={search} onChange={e => setSearch(e.target.value)} />
-        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}>ðŸ‘¤ Collector-wise</button>
+          placeholder="Search member, loan ID, collector" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}> Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalSanctioned} totalLabel="Total Sanctioned"
         onCSV={() => exportCSV(csvRows, LD_COLS, 'loan-details-report')}
         onPDF={() => printPDF('Loan Details Report', 'All Active Loans', LD_COLS, csvRows,
           [['Total Loans', filtered.length], ['Total Sanctioned', fmtINR(totalSanctioned)]])} />
-      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loadingâ€¦</p></div> :
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records found.</p></div> :
         grouped ? <CollectorGrouped rows={filtered} cols={LD_COLS} renderRow={renderLDRow} amountKey="sanctionedAmount" /> :
         <div className="panel scroll-x">

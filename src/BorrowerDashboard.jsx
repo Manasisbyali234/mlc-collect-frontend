@@ -78,7 +78,7 @@ export default function BorrowerDashboard() {
     </div>
   );
 
-  if (!data) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>;
+  if (!data) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading</div>;
 
   const paidPct = data.totalDue > 0 ? Math.min(100, Math.round((data.totalPaid / data.totalDue) * 100)) : 0;
   const missedDays = data.missedDays || 0;

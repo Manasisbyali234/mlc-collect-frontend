@@ -131,14 +131,14 @@ export function EmployeeLedger() {
           <input
             className="search"
             style={{ marginBottom: 16 }}
-            placeholder="Search employee by name, ID, or mobile…"
+            placeholder="Search employee by name, ID, or mobile..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
 
           {membersLoading ? (
             <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}>
-              <p className="muted">Loading employees…</p>
+              <p className="muted">Loading employees</p>
             </div>
           ) : searchFiltered.length === 0 ? (
             <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}>
@@ -197,7 +197,7 @@ export function EmployeeLedger() {
                 <input
                   className="input"
                   style={{ padding: '9px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }}
-                  placeholder="Search employee…"
+                  placeholder="Search employee..."
                   value={search}
                   onChange={e => { setSearch(e.target.value); setShowDrop(true); }}
                   onFocus={() => setShowDrop(true)}
@@ -245,7 +245,7 @@ export function EmployeeLedger() {
 
           {loading && (
             <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}>
-              <p className="muted">Loading ledger…</p>
+              <p className="muted">Loading ledger</p>
             </div>
           )}
 

@@ -188,7 +188,7 @@ export function Collect() {
       </PageHeader>
 
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : (
         <>
           {/* Disbursed loans table */}
@@ -271,7 +271,7 @@ export function Collect() {
             <div style={{ display:'grid', gap:14 }}>
               <div>
                 <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Selected Customer <span style={{ color:'var(--red-tx)' }}>*</span></label>
-                <input className="input" style={{ padding:'10px 12px', fontSize:14, marginBottom:6 }} placeholder="Search customer name…" value={appSearch} onChange={e => { setAppSearch(e.target.value); setSelectedApp(null); setAppDetail(null); }} />
+                <input className="input" style={{ padding:'10px 12px', fontSize:14, marginBottom:6 }} placeholder="Search customer name..." value={appSearch} onChange={e => { setAppSearch(e.target.value); setSelectedApp(null); setAppDetail(null); }} />
                 {appSearch && (
                   <div style={{ border:'1px solid var(--line)', borderRadius:10, maxHeight:180, overflowY:'auto', background:'#fff' }}>
                     {apps.filter(a => a.memberName.toLowerCase().includes(appSearch.toLowerCase())).map(a => (
@@ -287,7 +287,7 @@ export function Collect() {
                 )}
               </div>
 
-              {detailLoading && <p className="muted" style={{ fontSize:13, margin:0 }}>Loading loan details…</p>}
+              {detailLoading && <p className="muted" style={{ fontSize:13, margin:0 }}>Loading loan details</p>}
 
               {appDetail && (
                 <div style={{ background:'var(--soft)', borderRadius:14, padding:'14px 16px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
@@ -318,12 +318,14 @@ export function Collect() {
                 <input className="input" type="date" style={{ padding:'10px 12px', fontSize:14 }} value={payDate} onChange={e => setPayDate(e.target.value)} />
               </div>
 
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Amount Paid (₹) <span style={{ color:'var(--red-tx)' }}>*</span></label>
-                <input className="input mono" style={{ padding:'10px 12px', fontSize:14 }} type="number" min="1"
-                  value={amountPaid} onChange={e => setAmountPaid(e.target.value)}
-                  placeholder={outstanding > 0 ? `Max ₹${outstanding.toLocaleString('en-IN')}` : 'Enter amount'} />
-              </div>
+              {selectedApp && (
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Amount Paid (₹) <span style={{ color:'var(--red-tx)' }}>*</span></label>
+                  <input className="input mono" style={{ padding:'10px 12px', fontSize:14 }} type="number" min="1"
+                    value={amountPaid} onChange={e => setAmountPaid(e.target.value)}
+                    placeholder={outstanding > 0 ? `Max ₹${outstanding.toLocaleString('en-IN')}` : 'Enter amount'} />
+                </div>
+              )}
 
               <div>
                 <label style={{ display:'block', fontSize:13, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Remarks (Optional)</label>
@@ -339,7 +341,7 @@ export function Collect() {
                   </div>
                 ) : (
                   <button type='button' className="btn outline" style={{ width:'100%' }} onClick={capturePayLocation} disabled={locLoading}>
-                    {locLoading ? 'Getting location…' : '📍 Capture Live Location'}
+                    {locLoading ? 'Getting location' : '📍 Capture Live Location'}
                   </button>
                 )}
               </div>
@@ -367,7 +369,7 @@ export function Collect() {
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:22 }}>
               <button className="btn outline" onClick={closeModal}>Cancel</button>
               <button className="btn gold" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save Payment'}
+                {saving ? 'Saving' : 'Save Payment'}
               </button>
             </div>
           </div>
@@ -391,9 +393,9 @@ export function Customer() {
   return (
     <>
       <PageHeader title="Customers" sub="Registered members" />
-      <input className="search" placeholder="Search name, mobile, member ID…" style={{ marginBottom: 14 }} value={search} onChange={e => setSearch(e.target.value)} />
+      <input className="search" placeholder="Search name, mobile, member ID..." style={{ marginBottom: 14 }} value={search} onChange={e => setSearch(e.target.value)} />
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : filtered.length === 0 ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}>
           <p className="muted">{search ? 'No members match.' : 'No members yet.'}</p>
@@ -474,7 +476,7 @@ export function Record() {
     finally { setSaving(p => ({ ...p, [app.appId]: false })); }
   }
 
-  if (loading) return <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>;
+  if (loading) return <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>;
 
   return (
     <>
@@ -515,7 +517,7 @@ export function Record() {
         )}
         <div style={{ flex:1, minWidth:200 }}>
           <div className="lbl" style={{ marginBottom:6 }}>Search member</div>
-          <input className="input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, mobile, member ID…" />
+          <input className="input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, mobile, member ID..." />
         </div>
       </div>
 
@@ -557,7 +559,7 @@ export function Record() {
                           onClick={() => handleCollect(a)}
                           disabled={saving[a.appId]}
                         >
-                          {saving[a.appId] ? 'Saving…' : `Collect ₹${DAILY_EMI}`}
+                          {saving[a.appId] ? 'Saving' : `Collect ₹${DAILY_EMI}`}
                         </button>
                       )}
                     </td>
@@ -582,7 +584,7 @@ export function LoanAccount() {
     <>
       <PageHeader title="Loan Accounts" sub="All active loan accounts" />
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
       ) : accounts.length === 0 ? (
         <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">No loan accounts yet.</p></div>
       ) : (
@@ -687,7 +689,7 @@ export function Deposit() {
               </div>
             ) : (
               <button className="btn outline" style={{ marginBottom:14, width:'100%' }} onClick={captureLocation} disabled={locLoading}>
-                {locLoading ? 'Getting location…' : '📍 Capture Live Location'}
+                {locLoading ? 'Getting location' : '📍 Capture Live Location'}
               </button>
             )}
             <div className="lbl">Photo proof</div>
@@ -740,7 +742,7 @@ export function Deposit() {
               </>
             )}
             <button className="btn block" style={{ padding: 18, fontSize: 18 }} onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Submitting…' : 'Submit for verification'}
+              {submitting ? 'Submitting' : 'Submit for verification'}
             </button>
             <p className="muted" style={{ textAlign: 'center', fontSize: 14, margin: '10px 0 0' }}>Accountable Officer is emailed · today's entries lock</p>
           </div>
@@ -806,7 +808,7 @@ export function DepositHistory() {
       </div>
 
       {loading ? (
-        <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>
+        <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>
       ) : filtered.length === 0 ? (
         <div className='panel pad' style={{ textAlign:'center', padding:48 }}>
           <p className='muted'>No deposits{typeFilter !== 'All' ? ` for ${typeFilter}` : ''} yet.</p>

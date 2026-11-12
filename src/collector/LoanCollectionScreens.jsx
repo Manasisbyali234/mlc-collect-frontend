@@ -89,7 +89,7 @@ export function LoanCollection() {
   const filteredApps = (activeFilter === 'All' ? apps : apps.filter(a => a.status === activeFilter))
     .filter(a => !search || [a.memberName, a.memberId, a.mobile, a.appId].some(v => v && v.toLowerCase().includes(search.toLowerCase())));
   function setFilter(status) { setSearchParams(status === 'All' ? {} : { status }); }
-  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div>;
+  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>;
   return (
     <>
       <div className='page-header'>
@@ -100,7 +100,7 @@ export function LoanCollection() {
       </div>
 
       <div style={{ display:'flex', gap:0, borderBottom:'2px solid var(--line)', marginBottom:20 }}>
-        {[['loans','Loan Applications'],['closing','🔒 Closing Report']].map(([k,l]) => (
+        {[['loans','Loan Applications'],['closing',' Closing Report']].map(([k,l]) => (
           <button key={k} onClick={() => setMainTab(k)}
             style={{ padding:'10px 18px', border:0, borderBottom: mainTab===k ? '2px solid var(--g800)' : '2px solid transparent', background:'transparent', fontWeight: mainTab===k ? 700 : 400, cursor:'pointer', fontSize:13, marginBottom:-2 }}>
             {l}
@@ -109,7 +109,7 @@ export function LoanCollection() {
       </div>
 
       {mainTab === 'closing' && (
-        closingLoading ? <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading…</p></div> :
+        closingLoading ? <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div> :
         closingRows.length === 0 ? <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>No closed loans yet.</p></div> :
         <div className='panel scroll-x'>
           <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--line)', display:'flex', gap:24 }}>
@@ -152,7 +152,7 @@ export function LoanCollection() {
         ))}
       </div>
       <div style={{ marginBottom:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-        <input className='search' style={{ flex:1, minWidth:200, marginBottom:0 }} placeholder='Search name, mobile, App ID…' value={search} onChange={e => setSearch(e.target.value)} />
+        <input className='search' style={{ flex:1, minWidth:200, marginBottom:0 }} placeholder='Search name, mobile, App ID' value={search} onChange={e => setSearch(e.target.value)} />
         {activeFilter !== 'All' && (
           <><span className='pill yellow'>Filtered: {activeFilter}</span>
           <button className='btn sm outline' onClick={() => setFilter('All')}>Clear filter</button></>
@@ -187,9 +187,9 @@ export function LoanCollection() {
                             {paidPct.toFixed(0)}% paid
                           </span>
                         )}
-                        {paidPct >= 50 && (
+                        {s && paidPct >= 50 && (
                           <button className='btn sm gold' onClick={() => nav('/app/loan-collection/apply/' + a.memberId)}
-                            title={`${paidPct.toFixed(1)}% repaid — eligible for new loan`}>
+                            title={`${paidPct.toFixed(1)}% repaid · eligible for new loan`}>
                             + New Loan
                           </button>
                         )}
@@ -310,7 +310,7 @@ export function NewMemberForm() {
         </div>
         {submitError && (
           <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-tx)', borderRadius:10, padding:'12px 16px', marginBottom:16, color:'var(--red-tx)', fontSize:14 }}>
-            ⚠️ {submitError}
+            âš ï¸ {submitError}
           </div>
         )}
         <div className='row' style={{ gap:12, justifyContent:'flex-end' }}>
@@ -554,7 +554,7 @@ export function LoanApplicationForm() {
           <div className='row' style={{ gap:12, justifyContent:'flex-end' }}>
             <button type='button' className='btn outline' onClick={() => setStep(3)}>Back</button>
             <button type='button' className='btn outline' onClick={saveDraft}>Save Draft</button>
-            <button type='button' className='btn gold' style={{ padding:'14px 32px' }} onClick={handleSubmit} disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Application'}</button>
+            <button type='button' className='btn gold' style={{ padding:'14px 32px' }} onClick={handleSubmit} disabled={submitting}>{submitting ? 'Submitting' : 'Submit Application'}</button>
           </div>
         </div>
       )}

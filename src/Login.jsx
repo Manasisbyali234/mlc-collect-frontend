@@ -120,7 +120,7 @@ export default function Login() {
               <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
             <button className="btn block" style={{ padding: 22, fontSize: 18 }} disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
         )}
@@ -139,7 +139,7 @@ export default function Login() {
               <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
             <button className="btn block" style={{ padding: 22, fontSize: 18 }} disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
             <div style={{ marginTop: 16, textAlign: 'center' }}>
               <span className="muted" style={{ fontSize: 14 }}>First time? </span>
@@ -162,7 +162,7 @@ export default function Login() {
               <input className="input mono" value={mobile} onChange={e => setMobile(e.target.value)} placeholder="e.g. 99001 23456" required />
             </div>
             <button className="btn block" style={{ padding: 18, fontSize: 16 }} disabled={loading}>
-              {loading ? 'Sending…' : 'Send OTP'}
+              {loading ? 'Sending...' : 'Send OTP'}
             </button>
             <div style={{ marginTop: 14, textAlign: 'center' }}>
               <button type="button" className="link" style={{ fontSize: 14, background: 'none', border: 0, padding: 0 }}
@@ -184,7 +184,7 @@ export default function Login() {
               <input className="input mono" value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-digit OTP" maxLength={6} required autoFocus />
             </div>
             <button className="btn block" style={{ padding: 18, fontSize: 16 }} disabled={loading}>
-              {loading ? 'Verifying…' : 'Verify OTP'}
+              {loading ? 'Verifying...' : 'Verify OTP'}
             </button>
             <div style={{ marginTop: 14, textAlign: 'center' }}>
               <button type="button" className="link" style={{ fontSize: 14, background: 'none', border: 0, padding: 0 }}
@@ -210,7 +210,7 @@ export default function Login() {
               <input className="input" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} required />
             </div>
             <button className="btn block" style={{ padding: 18, fontSize: 16 }} disabled={loading}>
-              {loading ? 'Saving…' : 'Set password & sign in'}
+              {loading ? 'Saving' : 'Set password & sign in'}
             </button>
           </form>
         )}

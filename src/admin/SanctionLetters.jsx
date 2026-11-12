@@ -127,7 +127,7 @@ function LetterModal({ letterId, onClose }) {
 
   if (loading) return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'grid', placeItems: 'center', zIndex: 200 }}>
-      <div className="panel pad" style={{ padding: 40 }}><p className="muted">Loading…</p></div>
+      <div className="panel pad" style={{ padding: 40 }}><p className="muted">Loading</p></div>
     </div>
   );
 
@@ -195,7 +195,7 @@ function LetterModal({ letterId, onClose }) {
             </div>
           </div>
           <button className="btn sm" style={{ marginTop: 12 }} onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Delivery Status'}
+            {saving ? 'Saving' : 'Save Delivery Status'}
           </button>
         </div>
 
@@ -291,7 +291,7 @@ export function SanctionLetters() {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="search" style={{ flex: 1, minWidth: 220, marginBottom: 0 }}
-          placeholder="Search member, letter no, app ID…" value={search} onChange={e => setSearch(e.target.value)} />
+          placeholder="Search member, letter no, app ID..." value={search} onChange={e => setSearch(e.target.value)} />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           style={{ padding: '9px 14px', border: '1px solid var(--line)', borderRadius: 10, fontSize: 14, background: '#fff' }}>
           <option>All</option>
@@ -315,7 +315,7 @@ export function SanctionLetters() {
       </div>
 
       {loading
-        ? <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}><p className="muted">Loading…</p></div>
+        ? <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}><p className="muted">Loading</p></div>
         : filtered.length === 0
           ? <div className="panel pad" style={{ textAlign: 'center', padding: 48 }}><p className="muted">No sanction letters found.</p></div>
           : (
