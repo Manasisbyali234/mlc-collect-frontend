@@ -131,7 +131,7 @@ export default function BorrowerDashboard() {
         )}
 
         {/* Summary cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: data.penalty > 0 ? 12 : 20 }}>
+        <div className="borrower-summary-grid">
           <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: 16 }}>
             <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Amount Received</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, marginTop: 6 }}>{fmt(data.netDisbursalAmount || data.loanAmount)}</div>

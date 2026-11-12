@@ -5,7 +5,8 @@ import { api } from './api.js';
 export default function Login() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState(searchParams.get('mode') === 'collector' ? 'collector' : 'admin');
+  const modeParam = searchParams.get('mode');
+  const [mode, setMode] = useState(modeParam === 'collector' ? 'collector' : modeParam === 'subadmin' ? 'subadmin' : 'admin');
   const [step, setStep] = useState('login'); // 'login' | 'otp' | 'otp-verify' | 'set-password'
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
@@ -16,11 +17,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   function switchMode(m) {
-    setMode(m);
-    setStep('login');
+    setMode(m); setStep('login');
     setMobile(''); setPassword(''); setOtp('');
-    setNewPass(''); setConfirmPass('');
-    setError('');
+    setNewPass(''); setConfirmPass(''); setError('');
   }
 
   async function handleLogin(e) {
@@ -30,7 +29,7 @@ export default function Login() {
     try {
       const user = await api.login(mobile, password);
       localStorage.setItem('mlc_user', JSON.stringify(user));
-      nav(user.role === 'admin' ? '/admin' : '/app');
+      nav(user.role === 'admin' ? '/admin' : user.role === 'subadmin' ? '/subadmin' : '/app');
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {
@@ -102,14 +101,15 @@ export default function Login() {
         {!searchParams.get('mode') && (
           <div className="toggle2" style={{ marginBottom: 20 }}>
             <button type="button" className={mode === 'admin' ? 'on' : ''} onClick={() => switchMode('admin')}>Admin</button>
+            <button type="button" className={mode === 'subadmin' ? 'on' : ''} onClick={() => switchMode('subadmin')}>Sub Admin</button>
             <button type="button" className={mode === 'collector' ? 'on' : ''} onClick={() => switchMode('collector')}>Collector</button>
           </div>
         )}
 
-        {/* ── Admin login ── */}
-        {mode === 'admin' && (
+        {/* ── Admin / Sub-Admin login ── */}
+        {(mode === 'admin' || mode === 'subadmin') && (
           <form className="login-card" onSubmit={handleLogin}>
-            <h2>Admin sign in</h2>
+            <h2>{mode === 'subadmin' ? 'Sub Admin sign in' : 'Admin sign in'}</h2>
             {errBox}
             <div className="field">
               <label>User ID</label>

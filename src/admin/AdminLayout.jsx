@@ -6,6 +6,8 @@ const tabs = [
   { to: '/admin/customers', label: 'Customers (CIF)', icon: '👥' },
   { to: '/admin/loans', label: 'Loan Accounts', icon: '📄' },
   { to: '/admin/loan-applications', label: 'Loan Applications', icon: '📝' },
+  { to: '/admin/loan-applications?status=NPA', label: 'NPA Accounts', icon: '🔴' },
+  { to: '/admin/missed-emi', label: 'Missed EMI', icon: '⚠️' },
   { to: '/admin/collections', label: 'Collections', icon: '💰' },
   { to: '/admin/deposits', label: 'Deposits', icon: '🏦' },
   { to: '/admin/targets', label: 'Targets', icon: '🎯' },
@@ -56,7 +58,12 @@ export default function AdminLayout() {
               key={t.to}
               to={t.to}
               end={t.end}
-              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+              className={({ isActive }) => {
+                if (t.to === '/admin/loan-applications?status=NPA') {
+                  return `sidebar-link${window.location.search === '?status=NPA' && window.location.pathname === '/admin/loan-applications' ? ' active' : ''}`;
+                }
+                return `sidebar-link${isActive ? ' active' : ''}`;
+              }}
               onClick={() => setOpen(false)}
             >
               <span className="sidebar-icon">{t.icon}</span>

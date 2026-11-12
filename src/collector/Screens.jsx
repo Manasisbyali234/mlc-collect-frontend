@@ -480,7 +480,7 @@ export function Record() {
     <>
       <PageHeader title="Record Collection" sub={`${user.name} · ${todayKey}`} />
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:18 }}>
+      <div className="stat-grid-3b">
         <div className="panel pad" style={{ textAlign:'center' }}>
           <div className="eyebrow" style={{ fontSize:11 }}>Total Due Today</div>
           <div className="mono" style={{ fontSize:28, fontWeight:700 }}>₹{(filtered.length * DAILY_EMI).toLocaleString('en-IN')}</div>
@@ -776,7 +776,7 @@ export function DepositHistory() {
       <PageHeader title="Deposit History" sub="All your submitted deposits by method" />
 
       {/* Summary cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:18 }}>
+      <div className="stat-grid-4b">
         {DEP_TYPES.slice(1).map(t => {
           const amt = deposits.filter(d => d.method === t).reduce((s,d) => s + Number(d.amount||0), 0);
           return (
@@ -860,7 +860,7 @@ export function Targets() {
       <PageHeader title="My targets" sub={new Date().toLocaleDateString('en-IN', { month:'long', year:'numeric' })} />
       {myTarget ? (
         <div className="panel pad">
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18 }}>
+          <div className="targets-grid">
             {[['New applicants', myTarget.newApplicants],['Approvals', myTarget.approvals],['Approved value', myTarget.approvedValue ? '₹'+myTarget.approvedValue : '–'],['Collection', myTarget.collection ? '₹'+myTarget.collection : '–'],['Efficiency target', myTarget.efficiency ? myTarget.efficiency+'%' : '–']].map(([k,v]) => (
               <div key={k}>
                 <div className="eyebrow" style={{ fontSize:11 }}>{k}</div>

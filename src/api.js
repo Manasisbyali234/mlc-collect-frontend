@@ -65,7 +65,7 @@ export const api = {
   saveTarget: (data) => req('POST', '/targets', data),
   updateTarget: (id, data) => req('PATCH', `/targets/${id}`, data),
 
-  getDashboard: () => req('GET', '/dashboard'),
+  getDashboard: (params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/dashboard${qs ? '?' + qs : ''}`); },
 
   getReportSummary: () => req('GET', '/reports/summary'),
   getReportDaily: (date) => req('GET', `/reports/daily?date=${date}`),
@@ -75,6 +75,9 @@ export const api = {
   getReportPaid: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/paid${qs?'?'+qs:''}`); },
   getReportCollectorWise: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/collector-wise${qs?'?'+qs:''}`); },
   getReportClosing: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/closing${qs?'?'+qs:''}`); },
+  getReportLoanDetails: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/loan-details${qs?'?'+qs:''}`); },
+
+  getMissedEmi: () => req('GET', '/reports/missed-emi'),
 
   getSanctionLetters: () => req('GET', '/sanction-letters'),
   getSanctionLetter: (id) => req('GET', `/sanction-letters/${id}`),

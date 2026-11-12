@@ -13,17 +13,33 @@ const Switch = ({ on: initial = false }) => {
 export function Dashboard() {
   const [stats, setStats] = useState(null);
   const [apps, setApps] = useState([]);
+  const [collectors, setCollectors] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [dailyTarget, setDailyTarget] = useState(0);
+  const [viewPhoto, setViewPhoto] = useState(null);
+  const [selectedCollector, setSelectedCollector] = useState('');
   const nav = useNavigate();
   useEffect(() => {
-    api.getDashboard().then(setStats).catch(() => {});
-    api.getApplications().then(setApps).catch(() => {});
+    api.getUsers().then(u => setCollectors(u.filter(x => x.role === 'collector'))).catch(() => {});
   }, []);
+  useEffect(() => {
+    const p = selectedCollector ? { collectorId: selectedCollector } : {};
+    api.getDashboard(p).then(s => { setStats(s); setDailyTarget((s.disbursed || 0) * 100); }).catch(() => {});
+    api.getApplications(p).then(setApps).catch(() => {});
+    api.getCollections(p).then(setCollections).catch(() => {});
+  }, [selectedCollector]);
+
+  const colTotal = collections.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const colCash = collections.filter(c => c.mode === 'Cash').reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const colUpi = collections.filter(c => c.mode !== 'Cash').reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
 
   async function handleAutoNpa() {
     try {
       const r = await api.autoNpa();
       alert(r.count > 0 ? `${r.count} loan(s) flagged as NPA: ${r.flagged.join(', ')}` : 'No new NPA accounts found.');
-      api.getDashboard().then(setStats).catch(() => {});
+      const p = selectedCollector ? { collectorId: selectedCollector } : {};
+      api.getDashboard(p).then(setStats).catch(() => {});
     } catch (e) { alert('Error: ' + e.message); }
   }
 
@@ -37,15 +53,21 @@ export function Dashboard() {
     ['Deposits to verify', stats ? stats.pendingDeposits : '–', 'pending verification', '/admin/deposits'],
     ['Collectors', stats ? stats.totalCollectors : '–', 'active collectors', '/admin/settings'],
     ['NPA Accounts', stats ? stats.totalNPA : '–', '>10 missed EMIs', '/admin/loan-applications?status=NPA'],
+    ['Missed EMI', '⚠ View', 'loans with missed payments', '/admin/missed-emi'],
   ];
 
   return (
     <>
       <div className="a-title">
-        <div><h1>Organisation dashboard</h1><p>All branches · live data</p></div>
+        <div><h1>Organisation dashboard</h1><p>{selectedCollector ? (collectors.find(c => c.id === selectedCollector)?.name || 'Selected collector') + ' · filtered' : 'All branches · live data'}</p></div>
         <div style={{ display:'flex', gap:10, alignItems:'center' }}>
           <button className="btn sm outline-red" onClick={handleAutoNpa}>⚑ Auto-flag NPA</button>
-          <select className="sel"><option>All branches</option></select>
+          <select className="sel" value={selectedCollector} onChange={e => setSelectedCollector(e.target.value)}>
+            <option value=''>All branches</option>
+            {collectors.map(c => (
+              <option key={c.id} value={c.id}>{c.name}{c.branch ? ` — ${c.branch}` : ''}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -56,6 +78,53 @@ export function Dashboard() {
           </div>
         ))}
       </div>
+
+      <div className="panel scroll-x" style={{ marginTop: 18 }}>
+        <div className="panel-head"><h3>Daily Collections</h3><Link to="/admin/collections" className="link" style={{ fontSize:13 }}>View all</Link></div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, padding:'14px 14px 0' }}>
+          {[
+            ['Total Collected','₹'+colTotal.toLocaleString('en-IN'),collections.length+' entries'],
+            ['Cash','₹'+colCash.toLocaleString('en-IN'),collections.filter(c=>c.mode==='Cash').length+' entries'],
+            ['PhonePe / UPI','₹'+colUpi.toLocaleString('en-IN'),collections.filter(c=>c.mode!=='Cash').length+' entries'],
+            ['Should Collect Today','₹'+dailyTarget.toLocaleString('en-IN'),'active loans × ₹100/day'],
+          ].map(([l,v,s]) => (
+            <div key={l} className="panel pad" style={{ textAlign:'center' }}>
+              <div className="eyebrow" style={{ fontSize:11 }}>{l}</div>
+              <div className="mono" style={{ fontSize:22, fontWeight:700, margin:'4px 0 2px' }}>{v}</div>
+              <div className="muted" style={{ fontSize:12 }}>{s}</div>
+            </div>
+          ))}
+        </div>
+        {collections.length === 0 ? (
+          <div style={{ padding:32, textAlign:'center' }}><p className="muted">No collections recorded yet.</p></div>
+        ) : (
+          <table className="dtable" style={{ marginTop:14 }}>
+            <thead><tr><th>Member</th><th>App ID</th><th>Collector</th><th className="r">Amount</th><th>Mode</th><th>Remarks</th><th>Date</th><th>Location</th><th>Photo</th></tr></thead>
+            <tbody>{collections.slice(-20).reverse().map(c => (
+              <tr key={c.id}>
+                <td><b>{c.memberName}</b><div className="muted" style={{ fontSize:12 }}>{c.memberId}</div></td>
+                <td className="mono" style={{ fontSize:12 }}>{c.appId || '–'}</td>
+                <td style={{ fontSize:13 }}>{c.collectorName}</td>
+                <td className="r mono" style={{ fontWeight:700 }}>₹{Number(c.amount).toLocaleString('en-IN')}</td>
+                <td><span className={'pill ' + (c.mode === 'Cash' ? 'green' : 'yellow')}>{c.mode}</span></td>
+                <td style={{ fontSize:13, color:'var(--muted)' }}>{c.reference || '–'}</td>
+                <td className="mono" style={{ fontSize:13 }}>{c.date}</td>
+                <td style={{ fontSize:12 }}>{c.location ? <a href={`https://maps.google.com/?q=${c.location.lat},${c.location.lng}`} target="_blank" rel="noreferrer" style={{ color:'var(--green-tx)' }}>📍 View</a> : '–'}</td>
+                <td>{c.photo ? <button className="btn sm" onClick={() => setViewPhoto(c.photo)}>View</button> : '–'}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
+
+      {viewPhoto && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setViewPhoto(null)}>
+          <div style={{ background:'#fff', borderRadius:16, padding:16, maxWidth:'90vw', maxHeight:'90vh' }} onClick={e => e.stopPropagation()}>
+            <img src={viewPhoto} alt="payment proof" style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:10, display:'block' }} />
+            <button className="btn outline" style={{ marginTop:12, width:'100%' }} onClick={() => setViewPhoto(null)}>Close</button>
+          </div>
+        </div>
+      )}
 
       <div className="panel scroll-x" style={{ marginTop: 18 }}>
         <div className="panel-head"><h3>Recent Loan Applications</h3><Link to="/admin/loan-applications" className="link" style={{ fontSize:13 }}>View all</Link></div>
@@ -281,8 +350,12 @@ export function CollectionGrid() {
   const [filterCollector, setFilterCollector] = useState('');
   const [filterMode, setFilterMode] = useState('');
   const [viewPhoto, setViewPhoto] = useState(null);
+  const [dailyTarget, setDailyTarget] = useState(0);
 
-  useEffect(() => { api.getCollections().then(setCollections).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    api.getCollections().then(setCollections).finally(() => setLoading(false));
+    api.getDashboard().then(s => setDailyTarget((s.disbursed || 0) * 100)).catch(() => {});
+  }, []);
 
   const collectors = [...new Set(collections.map(c => c.collectorName).filter(Boolean))];
   const modes = [...new Set(collections.map(c => c.mode).filter(Boolean))];
@@ -308,8 +381,13 @@ export function CollectionGrid() {
         <div><h1>Daily Collections</h1><p>{filtered.length} entries · ₹{total.toLocaleString('en-IN')} total</p></div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:18 }}>
-        {[['Total Collected','₹'+total.toLocaleString('en-IN'),filtered.length+' entries'],['Cash','₹'+cash.toLocaleString('en-IN'),filtered.filter(c=>c.mode==='Cash').length+' entries'],['PhonePe / UPI','₹'+upi.toLocaleString('en-IN'),filtered.filter(c=>c.mode!=='Cash').length+' entries']].map(([l,v,s]) => (
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:18 }}>
+        {[
+          ['Total Collected','₹'+total.toLocaleString('en-IN'),filtered.length+' entries'],
+          ['Cash','₹'+cash.toLocaleString('en-IN'),filtered.filter(c=>c.mode==='Cash').length+' entries'],
+          ['PhonePe / UPI','₹'+upi.toLocaleString('en-IN'),filtered.filter(c=>c.mode!=='Cash').length+' entries'],
+          ['Should Collect Today','₹'+dailyTarget.toLocaleString('en-IN'),'active loans × ₹100/day'],
+        ].map(([l,v,s]) => (
           <div key={l} className="panel pad" style={{ textAlign:'center' }}>
             <div className="eyebrow" style={{ fontSize:11 }}>{l}</div>
             <div className="mono" style={{ fontSize:26, fontWeight:700, margin:'4px 0 2px' }}>{v}</div>
@@ -584,7 +662,50 @@ export function Settings() {
   );
 }
 
-/* =============== Collector targets =============== */
+/* =============== Missed EMI =============== */
+export function MissedEmi() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  useEffect(() => { api.getMissedEmi().then(setRows).finally(() => setLoading(false)); }, []);
+  const filtered = rows.filter(r => {
+    const q = search.toLowerCase();
+    return !q || [r.memberName, r.memberId, r.appId, r.mobile, r.collectorName].some(v => v && v.toLowerCase().includes(q));
+  });
+  return (
+    <>
+      <div className="a-title">
+        <div><h1>⚠️ Missed EMI</h1><p>Borrowers who have not paid on time &middot; {rows.length} accounts</p></div>
+      </div>
+      <input className="search" style={{ marginBottom:16 }} placeholder="Search name, ID, mobile, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+      {loading ? (
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
+      ) : filtered.length === 0 ? (
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">{rows.length === 0 ? 'No missed EMIs found.' : 'No results match your search.'}</p></div>
+      ) : (
+        <div className="panel scroll-x">
+          <table className="dtable">
+            <thead><tr><th>App ID</th><th>Member</th><th>Mobile</th><th>Collector</th><th className="r">Loan Amount</th><th className="r">Total Missed</th><th className="r">Streak</th><th>Status</th><th></th></tr></thead>
+            <tbody>{filtered.map(r => (
+              <tr key={r.appId}>
+                <td className="mono" style={{ fontSize:13 }}>{r.appId}</td>
+                <td><b>{r.memberName}</b><div className="muted" style={{ fontSize:12 }}>{r.memberId}</div></td>
+                <td className="mono">{r.mobile}</td>
+                <td>{r.collectorName}</td>
+                <td className="r mono">₹{r.loanAmount.toLocaleString('en-IN')}</td>
+                <td className="r mono" style={{ color:'var(--red-tx)', fontWeight:700 }}>{r.totalMissed}</td>
+                <td className="r mono" style={{ color: r.missedStreak > 5 ? 'var(--red-tx)' : 'var(--yellow-tx)' }}>{r.missedStreak}</td>
+                <td><span className={'pill ' + (r.status === 'NPA' ? 'red' : 'yellow')}>{r.status}</span></td>
+                <td><Link to={'/admin/loan-applications/' + r.appId} className="btn sm">View</Link></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function CollectorTargets() {
   const [targets, setTargets] = useState([]);
   const [users, setUsers] = useState([]);

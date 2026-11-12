@@ -10,10 +10,11 @@ import {
 } from './collector/Screens.jsx';
 import { Defaulters } from './collector/DefaultersScreen.jsx';
 import AdminLayout from './admin/AdminLayout.jsx';
+import SubAdminLayout from './admin/SubAdminLayout.jsx';
 import {
   Dashboard, Alerts, CustomerProfile, MemberDetail, OpenLoan, CollectionGrid,
   DepositVerification, Settings, CollectorTargets,
-  LoanApplications, ApplicationDetail,
+  LoanApplications, ApplicationDetail, MissedEmi,
 } from './admin/Screens.jsx';
 import { Reports } from './admin/ReportsScreen.jsx';
 import { SanctionLetters } from './admin/SanctionLetters.jsx';
@@ -21,6 +22,12 @@ import { SanctionLetters } from './admin/SanctionLetters.jsx';
 function RequireAdmin({ children }) {
   const user = JSON.parse(localStorage.getItem('mlc_user') || 'null');
   if (!user || user.role !== 'admin') return <Navigate to="/login?mode=admin" replace />;
+  return children;
+}
+
+function RequireSubAdmin({ children }) {
+  const user = JSON.parse(localStorage.getItem('mlc_user') || 'null');
+  if (!user || user.role !== 'subadmin') return <Navigate to="/login?mode=subadmin" replace />;
   return children;
 }
 
@@ -42,9 +49,10 @@ function SignInDropdown() {
   }, []);
 
   const items = [
-    { icon: '📱', label: 'Collector App',   sub: 'Phone · Field use',        route: '/login?mode=collector' },
-    { icon: '🖥️', label: 'Admin Portal',    sub: 'Desktop · Management',     route: '/login?mode=admin' },
-    { icon: '🏦', label: 'Borrower Portal', sub: 'Track your loan & payments', route: '/borrower/login' },
+    { icon: '🏛️', label: 'Admin', sub: 'Full platform control', route: '/login?mode=admin' },
+    { icon: '🛡️', label: 'Sub Admin', sub: 'Limited admin access', route: '/login?mode=subadmin' },
+    { icon: '📱', label: 'Collector', sub: 'Field agent app', route: '/login?mode=collector' },
+    { icon: '🏠', label: 'Borrower', sub: 'Check your loan & EMIs', route: '/borrower/login' },
   ];
 
   return (
@@ -64,48 +72,48 @@ function SignInDropdown() {
   );
 }
 
+function PortalCards() {
+  const nav = useNavigate();
+  const portals = [
+    { icon: '🏛️', title: 'Admin', sub: 'Full platform control', desc: 'Manage collectors, verify deposits, view reports and dashboards.', route: '/login?mode=admin', style: { background: 'linear-gradient(135deg, rgba(217,160,46,.18) 0%, rgba(217,160,46,.06) 100%)', border: '1px solid rgba(217,160,46,.3)' }, btnClass: 'btn gold portal-btn' },
+    { icon: '🛡️', title: 'Sub Admin', sub: 'Limited admin access', desc: 'View collections, loans, and reports without full admin rights.', route: '/login?mode=subadmin', style: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)' }, btnClass: 'btn hero-btn-outline portal-btn' },
+    { icon: '📱', title: 'Collector', sub: 'Field agent app', desc: 'Record daily EMI payments, submit deposits, and track your route.', route: '/login?mode=collector', style: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)' }, btnClass: 'btn hero-btn-outline portal-btn' },
+    { icon: '🏠', title: 'Borrower', sub: 'Check your loan & EMIs', desc: 'View your loan details, EMI schedule, payment history and outstanding balance.', route: '/borrower/login', style: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)' }, btnClass: 'btn hero-btn-outline portal-btn' },
+  ];
+  return (
+    <div className="home-portals" id="portals">
+      {portals.map(p => (
+        <div key={p.title} className="portal-card" style={p.style}>
+          <div className="portal-icon">{p.icon}</div>
+          <div>
+            <h3>{p.title}</h3>
+            <div style={{ fontSize: 13, color: '#D9A02E', fontWeight: 600, marginBottom: 8 }}>{p.sub}</div>
+          </div>
+          <p>{p.desc}</p>
+          <button className={p.btnClass} onClick={() => nav(p.route)}>Sign In →</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const FEATURES = [
-  { icon: '📱', title: 'Field Collection App',  desc: 'Collectors record daily EMI payments on-the-go with instant sync to the server.' },
-  { icon: '🖥️', title: 'Admin Dashboard',       desc: 'Full visibility into loans, collections, deposits, and collector performance.' },
-  { icon: '📊', title: 'Live Analytics',         desc: 'Track daily targets, overdue accounts, and collection trends in real time.' },
-  { icon: '🔒', title: 'Secure & Role-Based',    desc: 'Separate portals for admins and field collectors with JWT-secured access.' },
-  { icon: '💰', title: 'Deposit Verification',   desc: 'Admins verify and approve cash deposits submitted by collectors each day.' },
-  { icon: '🎯', title: 'Target Management',      desc: 'Set monthly collection targets per collector and monitor progress live.' },
+  { icon: '📋', title: 'Daily EMI Collection',   desc: 'Field agents record cash & UPI payments on-the-go with GPS tagging and photo proof.' },
+  { icon: '📊', title: 'Live Dashboard',          desc: 'Real-time visibility into collections, pending dues, and collector performance.' },
+  { icon: '💰', title: 'Deposit Management',      desc: 'Collectors submit daily cash deposits; admins verify and approve with one click.' },
+  { icon: '⚠️', title: 'Defaulter Tracking',      desc: 'Automatically flags missed EMIs and overdue accounts for immediate follow-up.' },
+  { icon: '🎯', title: 'Target & Incentives',     desc: 'Set monthly collection targets per collector and track progress in real time.' },
+  { icon: '📄', title: 'Sanction Letters & Reports', desc: 'Generate loan sanction letters and export collection reports instantly.' },
 ];
 
 const STATS = [
-  { value: '100%',      label: 'Digital Records' },
-  { value: 'Daily',     label: 'EMI Tracking' },
-  { value: 'Real-Time', label: 'Sync & Alerts' },
-  { value: 'Secure',    label: 'JWT Auth' },
-];
-
-const PORTALS = [
-  {
-    icon: '📱', title: 'Collector App',
-    desc: 'Built for field agents. Record collections, view loan accounts, and submit deposits — all from your phone.',
-    btn: 'Open Collector App', route: '/login?mode=collector',
-    style: { background: 'linear-gradient(135deg,#1a5c35,#0f3d22)', border: '1px solid rgba(255,255,255,.12)' },
-    btnStyle: null,
-  },
-  {
-    icon: '🖥️', title: 'Admin Portal',
-    desc: 'Full management suite for supervisors. Monitor collectors, verify deposits, manage loans and targets.',
-    btn: 'Open Admin Portal', route: '/login?mode=admin',
-    style: { background: 'linear-gradient(135deg,#0b2e1f,#071a10)', border: '1px solid rgba(217,160,46,.2)' },
-    btnStyle: { background: 'rgba(217,160,46,.15)', color: '#D9A02E', border: '1px solid rgba(217,160,46,.35)' },
-  },
-  {
-    icon: '🏦', title: 'Borrower Portal',
-    desc: "Check your loan status, view how much you've paid, and track your pending balance anytime.",
-    btn: 'View My Loan', route: '/borrower/login',
-    style: { background: 'linear-gradient(135deg,#1a3a5c,#0d2240)', border: '1px solid rgba(217,160,46,.2)' },
-    btnStyle: { background: 'rgba(217,160,46,.15)', color: '#D9A02E', border: '1px solid rgba(217,160,46,.35)' },
-  },
+  { value: 'Secure', label: 'Role-Based Access' },
+  { value: '100%', label: 'Digital Records' },
+  { value: 'Daily', label: 'EMI Tracking' },
+  { value: 'Live', label: 'Sync & Alerts' },
 ];
 
 function Launcher() {
-  const nav = useNavigate();
   return (
     <div className="home-wrap">
 
@@ -126,16 +134,29 @@ function Launcher() {
 
       {/* Hero */}
       <section className="home-hero">
-        <div className="hero-bg-circles" aria-hidden="true"><span /><span /><span /></div>
+        <div className="hero-bg-circles" aria-hidden="true"><span /><span /><span /><span /></div>
         <div className="home-hero-inner">
           <div className="hero-badge">🏦 Mahalaxmi Co-Operative Society Ltd</div>
-          <div className="logo-m hero-logo">M</div>
-          <h1 className="home-title">MLC – Maha Laxmi Collect</h1>
-          <p className="home-sub">Daily Loan Collection · Field &amp; Admin Platform</p>
-          <div className="hero-cta">
-            <button className="btn gold hero-btn"         onClick={() => nav('/login?mode=collector')}>📱 Collector App</button>
-            <button className="btn hero-btn-outline"      onClick={() => nav('/login?mode=admin')}>🖥️ Admin Portal</button>
-            <button className="btn hero-btn-outline"      onClick={() => nav('/borrower/login')}>🏦 My Loan</button>
+          <div className="hero-emblem" aria-hidden="true">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+              <rect width="64" height="64" rx="18" fill="#D9A02E"/>
+              <text x="32" y="46" textAnchor="middle" fontFamily="system-ui,sans-serif" fontWeight="800" fontSize="36" fill="#0b382a">M</text>
+            </svg>
+          </div>
+          <h1 className="home-title">
+            Smarter Daily<br />
+            <span className="hero-highlight">Loan Collections</span>
+          </h1>
+          <p className="home-sub">Maha Laxmi Collect — the end-to-end platform for co-operative societies</p>
+          <div className="hero-divider" />
+          <p className="hero-desc">Digitise every EMI, track every collector, verify every deposit — all in real time. Built exclusively for co-operative societies.</p>
+          <div className="hero-signin-wrap">
+            <a href="#portals" className="btn gold hero-btn" style={{ textDecoration: 'none' }}>Get Started ↓</a>
+          </div>
+          <div className="hero-trust">
+            <span>🔒 Role-based access</span>
+            <span>📡 Real-time sync</span>
+            <span>📄 Instant reports</span>
           </div>
         </div>
       </section>
@@ -149,6 +170,27 @@ function Launcher() {
           </div>
         ))}
       </div>
+
+      {/* How it works */}
+      <section className="home-how">
+        <div className="home-features-inner">
+          <p className="home-section-label">How It Works</p>
+          <h2 className="home-section-title">From field collection to admin approval — all in one place</h2>
+          <div className="how-steps">
+            {[
+              { n: '01', title: 'Collector visits borrower', desc: 'Field agent opens the app, finds the loan account, and records the daily EMI payment.' },
+              { n: '02', title: 'Payment is logged instantly', desc: 'Amount, mode, GPS location, and photo proof are saved and synced to the server in real time.' },
+              { n: '03', title: 'Admin reviews & verifies', desc: 'Admin sees all collections on the dashboard, verifies cash deposits, and tracks targets.' },
+            ].map(s => (
+              <div key={s.n} className="how-step">
+                <div className="how-num">{s.n}</div>
+                <h4>{s.title}</h4>
+                <p>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Features */}
       <section className="home-features">
@@ -167,22 +209,13 @@ function Launcher() {
         </div>
       </section>
 
-      {/* Portal cards */}
-      <section className="home-portals">
-        {PORTALS.map(p => (
-          <div key={p.title} className="portal-card" style={p.style}>
-            <div className="portal-icon">{p.icon}</div>
-            <h3>{p.title}</h3>
-            <p>{p.desc}</p>
-            <button
-              className="btn portal-btn"
-              style={p.btnStyle || {}}
-              onClick={() => nav(p.route)}
-            >
-              {p.btn}
-            </button>
-          </div>
-        ))}
+      {/* Portal Sign-In Cards */}
+      <section style={{ padding: '72px 0 0', textAlign: 'center' }}>
+        <div className="home-features-inner" style={{ padding: '0 40px' }}>
+          <p className="home-section-label">Access Your Portal</p>
+          <h2 className="home-section-title" style={{ maxWidth: '100%' }}>Sign in to get started</h2>
+        </div>
+        <PortalCards />
       </section>
 
       {/* Footer */}
@@ -232,8 +265,20 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="loan-applications" element={<LoanApplications />} />
         <Route path="loan-applications/:appId" element={<ApplicationDetail />} />
+        <Route path="missed-emi" element={<MissedEmi />} />
         <Route path="reports" element={<Reports />} />
         <Route path="sanction-letters" element={<SanctionLetters />} />
+      </Route>
+
+      <Route path="/subadmin" element={<RequireSubAdmin><SubAdminLayout /></RequireSubAdmin>}>
+        <Route index element={<Dashboard />} />
+        <Route path="customers" element={<CustomerProfile />} />
+        <Route path="customers/:memberId" element={<MemberDetail />} />
+        <Route path="loans" element={<OpenLoan />} />
+        <Route path="collections" element={<CollectionGrid />} />
+        <Route path="deposits" element={<DepositVerification />} />
+        <Route path="missed-emi" element={<MissedEmi />} />
+        <Route path="reports" element={<Reports />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

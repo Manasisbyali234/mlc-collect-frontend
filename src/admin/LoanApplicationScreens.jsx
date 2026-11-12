@@ -95,7 +95,10 @@ export function LoanApplications() {
   return (
     <>
       <div className='a-title'>
-        <div><h1>Loan Applications</h1><p>All collector-submitted applications &middot; {apps.length} total</p></div>
+        <div>
+          <h1>{sf === 'NPA' ? '🔴 NPA Accounts' : 'Loan Applications'}</h1>
+          <p>{sf === 'NPA' ? `Borrowers who have not paid on time · ${filtered.length} accounts` : `All collector-submitted applications · ${apps.length} total`}</p>
+        </div>
       </div>
       <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap' }}>
         <input className='search' style={{ flex:1, minWidth:220, marginBottom:0 }} placeholder='Search name, ID, mobile, collector...' value={search} onChange={e => setSearch(e.target.value)} />

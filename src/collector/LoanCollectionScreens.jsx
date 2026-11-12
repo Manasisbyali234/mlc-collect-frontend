@@ -135,7 +135,7 @@ export function LoanCollection() {
       )}
 
       {mainTab === 'loans' && (<>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:14 }}>
+      <div className="stat-grid-4">
         {[['Total','All',counts.total,'#fff'],['Draft','Draft',counts.draft,'var(--soft)'],['Pending','Pending Admin Approval',counts.pending,'var(--yellow-bg)'],['Approved','Approved',counts.approved,'var(--green-bg)']].map(([l,s,v,bg]) => (
           <div key={l} className={'panel pad stat-card' + (activeFilter === s ? ' stat-card-active' : '')} style={{ background:bg }} onClick={() => setFilter(s)} role='button' tabIndex={0} onKeyDown={e => e.key === 'Enter' && setFilter(s)}>
             <div className='eyebrow' style={{ fontSize:11 }}>{l}</div>
@@ -143,7 +143,7 @@ export function LoanCollection() {
           </div>
         ))}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
+      <div className="stat-grid-3" style={{ marginBottom:24 }}>
         {[['Under Review','Under Review',counts.review,'var(--yellow-bg)'],['Rejected','Rejected',counts.rejected,'var(--red-bg)'],['Disbursed','Disbursed',counts.disbursed,'var(--green-bg)'],['NPA','NPA',counts.npa,'var(--red-bg)']].map(([l,s,v,bg]) => (
           <div key={l} className={'panel pad stat-card' + (activeFilter === s ? ' stat-card-active' : '')} style={{ background:bg }} onClick={() => setFilter(s)} role='button' tabIndex={0} onKeyDown={e => e.key === 'Enter' && setFilter(s)}>
             <div className='eyebrow' style={{ fontSize:11 }}>{l}</div>

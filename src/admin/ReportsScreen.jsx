@@ -81,6 +81,47 @@ function printPDF(title, subtitle, cols, rows, summaryLines) {
 
 const Pill = ({ c, children }) => <span className={'pill ' + c}>{children}</span>;
 
+function CollectorGrouped({ rows, cols, renderRow, amountKey }) {
+  const [open, setOpen] = useState({});
+  const groups = {};
+  rows.forEach(r => {
+    const k = r.collectorName || 'Unassigned';
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(r);
+  });
+  const names = Object.keys(groups).sort();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {names.map(name => {
+        const grp = groups[name];
+        const total = amountKey ? grp.reduce((s, r) => s + Number(r[amountKey] || 0), 0) : null;
+        const isOpen = open[name] !== false;
+        return (
+          <div key={name} className="panel" style={{ overflow: 'hidden' }}>
+            <div onClick={() => setOpen(o => ({ ...o, [name]: !isOpen }))}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', cursor: 'pointer', background: 'var(--g50, #f4faf6)', borderBottom: isOpen ? '1px solid var(--line)' : 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>👤 {name}</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--line)', borderRadius: 20, padding: '2px 10px' }}>{grp.length} records</span>
+                {total !== null && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--green-tx)' }}>{fmtINR(total)}</span>}
+              </div>
+              <span style={{ fontSize: 18, color: 'var(--muted)' }}>{isOpen ? '▲' : '▼'}</span>
+            </div>
+            {isOpen && (
+              <div className="scroll-x">
+                <table className="dtable">
+                  <thead><tr>{cols.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                  <tbody>{grp.map((r, i) => renderRow(r, i))}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SummaryCard({ label, value, sub, color }) {
   return (
     <div className="kpi" style={{ borderLeft: `4px solid ${color || 'var(--g800)'}` }}>
@@ -160,6 +201,7 @@ function DailyReport() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [grouped, setGrouped] = useState(false);
 
   function load(d) {
     setLoading(true);
@@ -174,8 +216,28 @@ function DailyReport() {
 
   const totalPaidToday = filtered.reduce((s, r) => s + Number(r.paidToday || 0), 0);
   const csvRows = filtered.map(r => ({ ...r, loanAmount: fmtINR(r.loanAmount), sanctionedAmount: fmtINR(r.sanctionedAmount), paidToday: fmtINR(r.paidToday), totalPaid: fmtINR(r.totalPaid), remaining: fmtINR(r.remaining), dueAmount: fmtINR(r.dueAmount) }));
-
   const statusColor = { Paid: 'green', Overdue: 'red', Pending: 'yellow', Cleared: 'grey' };
+
+  const renderDailyRow = (r, i) => (
+    <tr key={i}>
+      <td className="mono" style={{ fontSize: 12 }}>{r.date}</td>
+      <td><b>{r.memberName}</b></td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
+      <td>{r.collectorName}</td>
+      <td className="mono">{r.mobile}</td>
+      <td className="r mono">{fmtINR(r.loanAmount)}</td>
+      <td className="r mono">{fmtINR(r.sanctionedAmount)}</td>
+      <td className="r mono" style={{ color: r.paidToday > 0 ? 'var(--green-tx)' : 'inherit', fontWeight: r.paidToday > 0 ? 700 : 400 }}>{fmtINR(r.paidToday)}</td>
+      <td className="r mono">{fmtINR(r.totalPaid)}</td>
+      <td className="r mono" style={{ color: r.remaining > 0 ? 'var(--red-tx)' : 'var(--green-tx)' }}>{fmtINR(r.remaining)}</td>
+      <td><Pill c={statusColor[r.paymentStatus] || 'grey'}>{r.paymentStatus}</Pill></td>
+      <td>{r.paymentMode}</td>
+      <td className="mono" style={{ fontSize: 11 }}>{r.transactionRef}</td>
+      <td className="r mono">{fmtINR(r.dueAmount)}</td>
+      <td style={{ fontSize: 12, color: r.overdueStatus !== 'On track' ? 'var(--red-tx)' : 'var(--green-tx)' }}>{r.overdueStatus}</td>
+    </tr>
+  );
 
   return (
     <div>
@@ -184,6 +246,7 @@ function DailyReport() {
           style={{ padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, fontSize: 14, background: '#fff' }} />
         <input className="search" style={{ flex: 1, minWidth: 220, marginBottom: 0 }}
           placeholder="Search member, loan ID, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>
       </div>
       <ExportBar
         count={filtered.length}
@@ -195,29 +258,11 @@ function DailyReport() {
       />
       {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading…</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records for this date.</p></div> :
+        grouped ? <CollectorGrouped rows={filtered} cols={DAILY_COLS} renderRow={renderDailyRow} amountKey="paidToday" /> :
         <div className="panel scroll-x">
           <table className="dtable">
             <thead><tr>{DAILY_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-            <tbody>{filtered.map((r, i) => (
-              <tr key={i}>
-                <td className="mono" style={{ fontSize: 12 }}>{r.date}</td>
-                <td><b>{r.memberName}</b></td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
-                <td>{r.collectorName}</td>
-                <td className="mono">{r.mobile}</td>
-                <td className="r mono">{fmtINR(r.loanAmount)}</td>
-                <td className="r mono">{fmtINR(r.sanctionedAmount)}</td>
-                <td className="r mono" style={{ color: r.paidToday > 0 ? 'var(--green-tx)' : 'inherit', fontWeight: r.paidToday > 0 ? 700 : 400 }}>{fmtINR(r.paidToday)}</td>
-                <td className="r mono">{fmtINR(r.totalPaid)}</td>
-                <td className="r mono" style={{ color: r.remaining > 0 ? 'var(--red-tx)' : 'var(--green-tx)' }}>{fmtINR(r.remaining)}</td>
-                <td><Pill c={statusColor[r.paymentStatus] || 'grey'}>{r.paymentStatus}</Pill></td>
-                <td>{r.paymentMode}</td>
-                <td className="mono" style={{ fontSize: 11 }}>{r.transactionRef}</td>
-                <td className="r mono">{fmtINR(r.dueAmount)}</td>
-                <td style={{ fontSize: 12, color: r.overdueStatus !== 'On track' ? 'var(--red-tx)' : 'var(--green-tx)' }}>{r.overdueStatus}</td>
-              </tr>
-            ))}</tbody>
+            <tbody>{filtered.map((r, i) => renderDailyRow(r, i))}</tbody>
           </table>
         </div>
       }
@@ -233,6 +278,7 @@ function WeeklyReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [subTab, setSubTab] = useState('summary');
+  const [grouped, setGrouped] = useState(false);
 
   const range = weekRange(anchor);
 
@@ -268,6 +314,9 @@ function WeeklyReport() {
   const colRows = (data?.collectorSummary || []).map(r => ({ ...r, totalAmount: fmtINR(r.totalAmount), collected: fmtINR(r.collected), outstanding: fmtINR(r.outstanding) }));
   const paidRows = (data?.paidMembers || []).map(r => ({ ...r, amountPaid: fmtINR(r.amountPaid) }));
 
+  const renderPaidRow = (r, i) => <tr key={i}>{PAID_COLS.map(c => <td key={c.key} className={c.key==='amountPaid'?'r mono':''}>{r[c.key]}</td>)}</tr>;
+  const renderMissedRow = (r, i) => <tr key={i}>{MISSED_COLS.map(c => <td key={c.key}>{r[c.key]}</td>)}</tr>;
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -285,13 +334,14 @@ function WeeklyReport() {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
             {[['summary', 'Collector Summary'], ['paid', 'Paid Members'], ['missed', 'Missed Members']].map(([k, l]) => (
-              <button key={k} onClick={() => setSubTab(k)}
+              <button key={k} onClick={() => { setSubTab(k); setGrouped(false); }}
                 style={{ padding: '8px 18px', border: 0, borderBottom: subTab === k ? '2px solid var(--g800)' : '2px solid transparent', background: 'transparent', fontWeight: subTab === k ? 700 : 400, cursor: 'pointer', fontSize: 13, marginBottom: -2 }}>
                 {l}
               </button>
             ))}
+            {subTab !== 'summary' && <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ marginLeft: 'auto' }} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>}
           </div>
 
           {subTab === 'summary' && (
@@ -308,23 +358,25 @@ function WeeklyReport() {
           {subTab === 'paid' && (
             <>
               <ExportBar count={paidRows.length} total={data.totalCollected} totalLabel="Total Collected" onCSV={() => exportCSV(paidRows, PAID_COLS, `weekly-paid-${range.from}`)} onPDF={() => printPDF('Weekly Paid Members', `${range.from} to ${range.to}`, PAID_COLS, paidRows, [['Total Collected', fmtINR(data.totalCollected)], ['Members Paid', data.paidMembersCount]])} />
-              <div className="panel scroll-x">
-                <table className="dtable">
-                  <thead><tr>{PAID_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-                  <tbody>{paidRows.map((r, i) => <tr key={i}>{PAID_COLS.map(c => <td key={c.key} className={c.key==='amountPaid'?'r mono':''}>{r[c.key]}</td>)}</tr>)}</tbody>
-                </table>
-              </div>
+              {grouped ? <CollectorGrouped rows={paidRows} cols={PAID_COLS} renderRow={renderPaidRow} amountKey="amountPaid" /> :
+                <div className="panel scroll-x">
+                  <table className="dtable">
+                    <thead><tr>{PAID_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                    <tbody>{paidRows.map((r, i) => renderPaidRow(r, i))}</tbody>
+                  </table>
+                </div>}
             </>
           )}
           {subTab === 'missed' && (
             <>
               <ExportBar count={data.missedMembersList.length} onCSV={() => exportCSV(data.missedMembersList, MISSED_COLS, `weekly-missed-${range.from}`)} onPDF={() => printPDF('Weekly Missed Members', `${range.from} to ${range.to}`, MISSED_COLS, data.missedMembersList, [['Members Missed', data.missedMembersCount]])} />
-              <div className="panel scroll-x">
-                <table className="dtable">
-                  <thead><tr>{MISSED_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-                  <tbody>{data.missedMembersList.map((r, i) => <tr key={i}>{MISSED_COLS.map(c => <td key={c.key}>{r[c.key]}</td>)}</tr>)}</tbody>
-                </table>
-              </div>
+              {grouped ? <CollectorGrouped rows={data.missedMembersList} cols={MISSED_COLS} renderRow={renderMissedRow} /> :
+                <div className="panel scroll-x">
+                  <table className="dtable">
+                    <thead><tr>{MISSED_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                    <tbody>{data.missedMembersList.map((r, i) => renderMissedRow(r, i))}</tbody>
+                  </table>
+                </div>}
             </>
           )}
         </>
@@ -343,6 +395,7 @@ function MonthlyReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [subTab, setSubTab] = useState('overview');
+  const [grouped, setGrouped] = useState(false);
 
   function load() {
     setLoading(true);
@@ -374,6 +427,10 @@ function MonthlyReport() {
     ['Members Unpaid', data.unpaidMembersCount],
   ] : [];
 
+  const renderHistRow = (r, i) => (
+    <tr key={i}>{HIST_COLS.map(c => <td key={c.key} className={['loanAmount','paidInMonth','totalPaid','remaining'].includes(c.key)?'r mono':''}>{r[c.key]}</td>)}</tr>
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -396,13 +453,14 @@ function MonthlyReport() {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
             {[['overview', 'Overview'], ['performance', 'Collector Performance'], ['history', 'Loan-wise History']].map(([k, l]) => (
-              <button key={k} onClick={() => setSubTab(k)}
+              <button key={k} onClick={() => { setSubTab(k); setGrouped(false); }}
                 style={{ padding: '8px 18px', border: 0, borderBottom: subTab === k ? '2px solid var(--g800)' : '2px solid transparent', background: 'transparent', fontWeight: subTab === k ? 700 : 400, cursor: 'pointer', fontSize: 13, marginBottom: -2 }}>
                 {l}
               </button>
             ))}
+            {subTab === 'history' && <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ marginLeft: 'auto' }} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>}
           </div>
 
           {subTab === 'performance' && (
@@ -419,12 +477,13 @@ function MonthlyReport() {
           {subTab === 'history' && (
             <>
               <ExportBar count={histRows.length} onCSV={() => exportCSV(histRows, HIST_COLS, `monthly-loans-${year}-${month}`)} onPDF={() => printPDF('Monthly Loan Payment History', `${MONTHS[+month-1]} ${year}`, HIST_COLS, histRows, overviewCards.map(([k,v])=>[k,String(v)]))} />
-              <div className="panel scroll-x">
-                <table className="dtable">
-                  <thead><tr>{HIST_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-                  <tbody>{histRows.map((r, i) => <tr key={i}>{HIST_COLS.map(c => <td key={c.key} className={['loanAmount','paidInMonth','totalPaid','remaining'].includes(c.key)?'r mono':''}>{r[c.key]}</td>)}</tr>)}</tbody>
-                </table>
-              </div>
+              {grouped ? <CollectorGrouped rows={histRows} cols={HIST_COLS} renderRow={renderHistRow} amountKey="paidInMonth" /> :
+                <div className="panel scroll-x">
+                  <table className="dtable">
+                    <thead><tr>{HIST_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                    <tbody>{histRows.map((r, i) => renderHistRow(r, i))}</tbody>
+                  </table>
+                </div>}
             </>
           )}
         </>
@@ -453,6 +512,7 @@ function DefaultersReport() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [grouped, setGrouped] = useState(false);
 
   function load() {
     setLoading(true);
@@ -472,6 +532,24 @@ function DefaultersReport() {
   const totalPending = filtered.reduce((s, r) => s + Number(r.pendingAmount || 0), 0);
   const csvRows = filtered.map(r => ({ ...r, sanctionedAmount: fmtINR(r.sanctionedAmount), emiAmount: fmtINR(r.emiAmount), amountPaid: fmtINR(r.amountPaid), pendingAmount: fmtINR(r.pendingAmount), penalty: fmtINR(r.penalty) }));
   const statusColor = { 'Fully Paid': 'green', Overdue: 'red', Partial: 'yellow', Unpaid: 'red', Pending: 'yellow' };
+
+  const renderDefRow = (r, i) => (
+    <tr key={i} style={{ background: r.daysOverdue > 0 ? 'var(--red-bg)' : 'transparent' }}>
+      <td><b>{r.memberName}</b></td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
+      <td className="mono">{r.mobile}</td>
+      <td>{r.collectorName}</td>
+      <td className="r mono">{fmtINR(r.sanctionedAmount)}</td>
+      <td className="r mono">{fmtINR(r.emiAmount)}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.dueDate}</td>
+      <td className="r mono">{fmtINR(r.amountPaid)}</td>
+      <td className="r mono" style={{ color: 'var(--red-tx)', fontWeight: 700 }}>{fmtINR(r.pendingAmount)}</td>
+      <td className="r mono" style={{ color: r.daysOverdue > 0 ? 'var(--red-tx)' : 'inherit' }}>{r.daysOverdue}</td>
+      <td className="r mono" style={{ color: 'var(--red-tx)' }}>{fmtINR(r.penalty)}</td>
+      <td><Pill c={statusColor[r.paymentStatus] || 'grey'}>{r.paymentStatus}</Pill></td>
+    </tr>
+  );
 
   return (
     <div>
@@ -493,32 +571,18 @@ function DefaultersReport() {
         <button className="btn sm" style={{ alignSelf: 'flex-end' }} onClick={load}>Apply Filters</button>
         <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0, alignSelf: 'flex-end' }}
           placeholder="Search member, loan ID…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ alignSelf: 'flex-end' }} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalPending} totalLabel="Total Pending"
         onCSV={() => exportCSV(csvRows, DEF_COLS, `defaulters-report`)}
         onPDF={() => printPDF('Due & Defaulter Report', from && to ? `${from} to ${to}` : 'All Active Loans', DEF_COLS, csvRows, [['Total Records', filtered.length], ['Total Pending', fmtINR(totalPending)]])} />
       {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading…</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records found.</p></div> :
+        grouped ? <CollectorGrouped rows={filtered} cols={DEF_COLS} renderRow={renderDefRow} amountKey="pendingAmount" /> :
         <div className="panel scroll-x">
           <table className="dtable">
             <thead><tr>{DEF_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-            <tbody>{filtered.map((r, i) => (
-              <tr key={i} style={{ background: r.daysOverdue > 0 ? 'var(--red-bg)' : 'transparent' }}>
-                <td><b>{r.memberName}</b></td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
-                <td className="mono">{r.mobile}</td>
-                <td>{r.collectorName}</td>
-                <td className="r mono">{fmtINR(r.sanctionedAmount)}</td>
-                <td className="r mono">{fmtINR(r.emiAmount)}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.dueDate}</td>
-                <td className="r mono">{fmtINR(r.amountPaid)}</td>
-                <td className="r mono" style={{ color: 'var(--red-tx)', fontWeight: 700 }}>{fmtINR(r.pendingAmount)}</td>
-                <td className="r mono" style={{ color: r.daysOverdue > 0 ? 'var(--red-tx)' : 'inherit' }}>{r.daysOverdue}</td>
-                <td className="r mono" style={{ color: 'var(--red-tx)' }}>{fmtINR(r.penalty)}</td>
-                <td><Pill c={statusColor[r.paymentStatus] || 'grey'}>{r.paymentStatus}</Pill></td>
-              </tr>
-            ))}</tbody>
+            <tbody>{filtered.map((r, i) => renderDefRow(r, i))}</tbody>
           </table>
         </div>
       }
@@ -543,6 +607,7 @@ function PaidMembersReport() {
   const [loading, setLoading] = useState(false);
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
+  const [grouped, setGrouped] = useState(false);
 
   function load(cat) {
     setLoading(true);
@@ -558,6 +623,22 @@ function PaidMembersReport() {
   const totalPaid = filtered.reduce((s, r) => s + Number(r.totalPaid || 0), 0);
   const csvRows = filtered.map(r => ({ ...r, totalLoanAmount: fmtINR(r.totalLoanAmount), emiAmount: fmtINR(r.emiAmount), totalPaid: fmtINR(r.totalPaid), remaining: fmtINR(r.remaining) }));
 
+  const renderPaidRow = (r, i) => (
+    <tr key={i}>
+      <td><b>{r.memberName}</b></td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
+      <td>{r.collectorName}</td>
+      <td className="mono">{r.mobile}</td>
+      <td className="r mono">{fmtINR(r.totalLoanAmount)}</td>
+      <td className="r mono">{fmtINR(r.emiAmount)}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.lastPaymentDate}</td>
+      <td className="r mono" style={{ color: 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.totalPaid)}</td>
+      <td className="r mono" style={{ color: r.remaining > 0 ? 'var(--red-tx)' : 'var(--green-tx)' }}>{fmtINR(r.remaining)}</td>
+      <td><Pill c={r.paymentStatus === 'Fully Paid' ? 'green' : 'yellow'}>{r.paymentStatus}</Pill></td>
+    </tr>
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -571,30 +652,18 @@ function PaidMembersReport() {
         </div>
         <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}
           placeholder="Search member, loan ID…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalPaid} totalLabel="Total Collected"
         onCSV={() => exportCSV(csvRows, PAID_COLS, `paid-members-report`)}
         onPDF={() => printPDF('Paid Members Report', category === 'all' ? 'All Paid Members' : category === 'fullypaid' ? 'Fully Paid' : 'Partially Paid', PAID_COLS, csvRows, [['Records', filtered.length], ['Total Collected', fmtINR(totalPaid)]])} />
       {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading…</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records found.</p></div> :
+        grouped ? <CollectorGrouped rows={filtered} cols={PAID_COLS} renderRow={renderPaidRow} amountKey="totalPaid" /> :
         <div className="panel scroll-x">
           <table className="dtable">
             <thead><tr>{PAID_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-            <tbody>{filtered.map((r, i) => (
-              <tr key={i}>
-                <td><b>{r.memberName}</b></td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
-                <td>{r.collectorName}</td>
-                <td className="mono">{r.mobile}</td>
-                <td className="r mono">{fmtINR(r.totalLoanAmount)}</td>
-                <td className="r mono">{fmtINR(r.emiAmount)}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.lastPaymentDate}</td>
-                <td className="r mono" style={{ color: 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.totalPaid)}</td>
-                <td className="r mono" style={{ color: r.remaining > 0 ? 'var(--red-tx)' : 'var(--green-tx)' }}>{fmtINR(r.remaining)}</td>
-                <td><Pill c={r.paymentStatus === 'Fully Paid' ? 'green' : 'yellow'}>{r.paymentStatus}</Pill></td>
-              </tr>
-            ))}</tbody>
+            <tbody>{filtered.map((r, i) => renderPaidRow(r, i))}</tbody>
           </table>
         </div>
       }
@@ -709,6 +778,7 @@ function ClosingReport() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [search, setSearch] = useState('');
+  const [grouped, setGrouped] = useState(false);
 
   function load() {
     setLoading(true);
@@ -727,6 +797,23 @@ function ClosingReport() {
   const totalClosed = filtered.reduce((s, r) => s + Number(r.loanAmount || 0), 0);
   const csvRows = filtered.map(r => ({ ...r, loanAmount: fmtINR(r.loanAmount), totalPaid: fmtINR(r.totalPaid) }));
 
+  const renderCloseRow = (r, i) => (
+    <tr key={i}>
+      <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.appId}</td>
+      <td><b>{r.memberName}</b></td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
+      <td className="mono">{r.mobile}</td>
+      <td>{r.collectorName}</td>
+      <td>{r.loanType}</td>
+      <td className="r mono">{fmtINR(r.loanAmount)}</td>
+      <td className="r mono" style={{ color: 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.totalPaid)}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.disbursalDate}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.closeDate}</td>
+      <td><Pill c="green">{r.status}</Pill></td>
+    </tr>
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -743,6 +830,7 @@ function ClosingReport() {
         <button className="btn sm" style={{ alignSelf: 'flex-end' }} onClick={load}>Apply</button>
         <input className="search" style={{ flex: 1, minWidth: 200, marginBottom: 0, alignSelf: 'flex-end' }}
           placeholder="Search member, loan ID, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} style={{ alignSelf: 'flex-end' }} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>
       </div>
       <ExportBar count={filtered.length} total={totalClosed} totalLabel="Total Loan Amount Closed"
         onCSV={() => exportCSV(csvRows, CLOSE_COLS, `closing-report${from ? '-' + from : ''}`)}
@@ -750,25 +838,94 @@ function ClosingReport() {
           [['Closed Loans', filtered.length], ['Total Amount', fmtINR(totalClosed)]])} />
       {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading…</p></div> :
         filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No closed loans found.</p></div> :
+        grouped ? <CollectorGrouped rows={filtered} cols={CLOSE_COLS} renderRow={renderCloseRow} amountKey="loanAmount" /> :
         <div className="panel scroll-x">
           <table className="dtable">
             <thead><tr>{CLOSE_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
-            <tbody>{filtered.map((r, i) => (
-              <tr key={i}>
-                <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.appId}</td>
-                <td><b>{r.memberName}</b></td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
-                <td className="mono">{r.mobile}</td>
-                <td>{r.collectorName}</td>
-                <td>{r.loanType}</td>
-                <td className="r mono">{fmtINR(r.loanAmount)}</td>
-                <td className="r mono" style={{ color: 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.totalPaid)}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.disbursalDate}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{r.closeDate}</td>
-                <td><Pill c="green">{r.status}</Pill></td>
-              </tr>
-            ))}</tbody>
+            <tbody>{filtered.map((r, i) => renderCloseRow(r, i))}</tbody>
+          </table>
+        </div>
+      }
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   9. LOAN DETAILS REPORT
+══════════════════════════════════════════ */
+const LD_COLS = [
+  { key: 'memberName', label: 'Member Name' },
+  { key: 'memberId', label: 'Member ID' },
+  { key: 'loanId', label: 'Loan ID' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'collectorName', label: 'Collector' },
+  { key: 'loanType', label: 'Loan Type' },
+  { key: 'sanctionedAmount', label: 'Sanctioned Amount' },
+  { key: 'sanctionDate', label: 'Sanction Date' },
+  { key: 'disbursalDate', label: 'Disbursal Date' },
+  { key: 'loanEndDate', label: 'Loan End Date' },
+  { key: 'dueDate', label: 'Due Date' },
+  { key: 'totalCollected', label: 'Amount Received' },
+  { key: 'remaining', label: 'Remaining' },
+  { key: 'status', label: 'Status' },
+];
+
+function LoanDetailsReport() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [grouped, setGrouped] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    api.getReportLoanDetails().then(setRows).catch(() => setRows([])).finally(() => setLoading(false));
+  }, []);
+
+  const filtered = rows.filter(r => {
+    const q = search.toLowerCase();
+    return !q || [r.memberName, r.memberId, r.loanId, r.collectorName, r.mobile].some(v => v && v.toLowerCase().includes(q));
+  });
+
+  const totalSanctioned = filtered.reduce((s, r) => s + Number(r.sanctionedAmount || 0), 0);
+  const csvRows = filtered.map(r => ({ ...r, sanctionedAmount: fmtINR(r.sanctionedAmount), totalCollected: fmtINR(r.totalCollected), remaining: fmtINR(r.remaining) }));
+
+  const renderLDRow = (r, i) => (
+    <tr key={i}>
+      <td><b>{r.memberName}</b></td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.memberId}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.loanId}</td>
+      <td className="mono">{r.mobile}</td>
+      <td>{r.collectorName}</td>
+      <td>{r.loanType}</td>
+      <td className="r mono">{fmtINR(r.sanctionedAmount)}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.sanctionDate}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.disbursalDate}</td>
+      <td className="mono" style={{ fontSize: 12, color: 'var(--red-tx)' }}>{r.loanEndDate}</td>
+      <td className="mono" style={{ fontSize: 12 }}>{r.dueDate}</td>
+      <td className="r mono" style={{ color: 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.totalCollected)}</td>
+      <td className="r mono" style={{ color: r.remaining > 0 ? 'var(--red-tx)' : 'var(--green-tx)', fontWeight: 700 }}>{fmtINR(r.remaining)}</td>
+      <td><Pill c={r.status === 'Disbursed' ? 'green' : r.status === 'Sanctioned' ? 'yellow' : 'grey'}>{r.status}</Pill></td>
+    </tr>
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input className="search" style={{ flex: 1, minWidth: 220, marginBottom: 0 }}
+          placeholder="Search member, loan ID, collector…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`btn sm${grouped ? '' : ' outline'}`} onClick={() => setGrouped(g => !g)}>👤 Collector-wise</button>
+      </div>
+      <ExportBar count={filtered.length} total={totalSanctioned} totalLabel="Total Sanctioned"
+        onCSV={() => exportCSV(csvRows, LD_COLS, 'loan-details-report')}
+        onPDF={() => printPDF('Loan Details Report', 'All Active Loans', LD_COLS, csvRows,
+          [['Total Loans', filtered.length], ['Total Sanctioned', fmtINR(totalSanctioned)]])} />
+      {loading ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">Loading…</p></div> :
+        filtered.length === 0 ? <div className="panel pad" style={{ textAlign: 'center', padding: 40 }}><p className="muted">No records found.</p></div> :
+        grouped ? <CollectorGrouped rows={filtered} cols={LD_COLS} renderRow={renderLDRow} amountKey="sanctionedAmount" /> :
+        <div className="panel scroll-x">
+          <table className="dtable">
+            <thead><tr>{LD_COLS.map(c => <th key={c.key}>{c.label}</th>)}</tr></thead>
+            <tbody>{filtered.map((r, i) => renderLDRow(r, i))}</tbody>
           </table>
         </div>
       }
@@ -785,6 +942,7 @@ const REPORT_TABS = [
   { key: 'paid', label: '✅ Paid Members' },
   { key: 'collector', label: '👤 Collector-wise' },
   { key: 'closing', label: '🔒 Closing Report' },
+  { key: 'loandetails', label: '📋 Loan Details' },
 ];
 
 export function Reports() {
@@ -810,6 +968,7 @@ export function Reports() {
       {tab === 'paid' && <PaidMembersReport />}
       {tab === 'collector' && <CollectorWiseReport />}
       {tab === 'closing' && <ClosingReport />}
+      {tab === 'loandetails' && <LoanDetailsReport />}
     </>
   );
 }
