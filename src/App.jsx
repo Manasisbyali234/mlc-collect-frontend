@@ -18,6 +18,7 @@ import {
 } from './admin/Screens.jsx';
 import { Reports } from './admin/ReportsScreen.jsx';
 import { SanctionLetters } from './admin/SanctionLetters.jsx';
+import { EmployeeLedger } from './admin/EmployeeLedger.jsx';
 
 function RequireAdmin({ children }) {
   const user = JSON.parse(localStorage.getItem('mlc_user') || 'null');
@@ -268,6 +269,7 @@ export default function App() {
         <Route path="missed-emi" element={<MissedEmi />} />
         <Route path="reports" element={<Reports />} />
         <Route path="sanction-letters" element={<SanctionLetters />} />
+        <Route path="employee-ledger" element={<EmployeeLedger />} />
       </Route>
 
       <Route path="/subadmin" element={<RequireSubAdmin><SubAdminLayout /></RequireSubAdmin>}>

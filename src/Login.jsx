@@ -131,8 +131,8 @@ export default function Login() {
             <h2>Collector sign in</h2>
             {errBox}
             <div className="field">
-              <label>Mobile number</label>
-              <input className="input mono" value={mobile} onChange={e => setMobile(e.target.value)} placeholder="e.g. 99001 23456" required />
+              <label>Mobile / Name</label>
+              <input className="input mono" value={mobile} onChange={e => setMobile(e.target.value)} placeholder="e.g. 99001 23456 or gangayya" required />
             </div>
             <div className="field">
               <label>Password</label>

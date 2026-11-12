@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
+import * as XLSX from 'xlsx';
 
 /* ── helpers ── */
 function toISO(d) { return d.toISOString().slice(0, 10); }
@@ -933,44 +934,313 @@ function LoanDetailsReport() {
   );
 }
 
-const REPORT_TABS = [
-  { key: 'summary', label: '📊 Summary' },
-  { key: 'daily', label: '📅 Daily' },
-  { key: 'weekly', label: '📆 Weekly' },
-  { key: 'monthly', label: '🗓 Monthly' },
-  { key: 'defaulters', label: '⚠ Due & Defaulters' },
-  { key: 'paid', label: '✅ Paid Members' },
-  { key: 'collector', label: '👤 Collector-wise' },
-  { key: 'closing', label: '🔒 Closing Report' },
-  { key: 'loandetails', label: '📋 Loan Details' },
-];
-
-export function Reports() {
-  const [tab, setTab] = useState('summary');
-  return (
-    <>
-      <div className="a-title">
-        <div><h1>Reports</h1><p>Daily · Weekly · Monthly · Defaulters · Paid · Collector-wise</p></div>
-      </div>
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--line)', marginBottom: 20, flexWrap: 'wrap' }}>
-        {REPORT_TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            style={{ padding: '10px 18px', border: 0, borderBottom: tab === t.key ? '2px solid var(--g800)' : '2px solid transparent', background: 'transparent', fontWeight: tab === t.key ? 700 : 400, cursor: 'pointer', fontSize: 13, marginBottom: -2, whiteSpace: 'nowrap' }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {tab === 'summary' && <ReportSummary />}
-      {tab === 'daily' && <DailyReport />}
-      {tab === 'weekly' && <WeeklyReport />}
-      {tab === 'monthly' && <MonthlyReport />}
-      {tab === 'defaulters' && <DefaultersReport />}
-      {tab === 'paid' && <PaidMembersReport />}
-      {tab === 'collector' && <CollectorWiseReport />}
-      {tab === 'closing' && <ClosingReport />}
-      {tab === 'loandetails' && <LoanDetailsReport />}
-    </>
-  );
+/* ══════════════════════════════════════════
+   10. INDIVIDUAL CUSTOMER DETAILED REPORT
+══════════════════════════════════════════ */
+function fmtDDMMYYYY(s) {
+  if (!s) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const [y,m,d] = s.slice(0,10).split('-'); return `${d}/${m}/${y}`; }
+  return s;
 }
 
-
+function IndividualCustomerReport() {
+  const [query,setQuery]=useState("");
+  const [suggestions,setSuggestions]=useState([]);
+  const [allMembers,setAllMembers]=useState([]);
+  const [selectedMember,setSelectedMember]=useState(null);
+  const [report,setReport]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [subTab,setSubTab]=useState("loans");
+  const [allCustLoading,setAllCustLoading]=useState(false);
+  const searchRef=useRef(null);
+  useEffect(()=>{api.getMembers().then(setAllMembers).catch(()=>{});},[]); 
+  useEffect(()=>{
+    if(!query.trim()){setSuggestions([]);return;}
+    const q=query.toLowerCase();
+    setSuggestions(allMembers.filter(m=>(m.name||"").toLowerCase().includes(q)||(m.mobile||"").includes(q)||(m.memberId||"").toLowerCase().includes(q)).slice(0,8));
+  },[query,allMembers]);
+  function selectMember(m){setSelectedMember(m);setQuery(m.name);setSuggestions([]);loadReport(m.memberId);}
+  function loadReport(mid){setLoading(true);setReport(null);api.getCustomerReport(mid).then(setReport).catch(()=>setReport(null)).finally(()=>setLoading(false));}
+  function exportIndividualExcel(){
+    if(!report)return;
+    const wb=XLSX.utils.book_new();
+    const {member,summary,loans,payments,deductions,npaHistory,latePaymentSummary}=report;
+    const ws1=XLSX.utils.aoa_to_sheet([["Mahalaxmi Co-Operative Society Ltd"],["Individual Customer Report"],["Generated:",new Date().toLocaleString("en-IN")],[],["Customer Name",member.name],["Customer ID",member.memberId],["Mobile",member.mobile||""],["Address",member.address||""],[],["Total Loans",summary.totalLoans],["Active Loans",summary.activeLoans],["NPA Loans",summary.npaLoans||0],["Total Borrowed",summary.totalBorrowed],["Service Charge",summary.totalProcessingFees||0],["Total Paid",summary.totalPaid],["Total Pending",summary.totalPending],["Late Payments",summary.totalLatePayments||0]]);
+    ws1["!cols"]=[{wch:30},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,ws1,"Summary");
+    const lh=["Sl","Loan ID","Type","App Date","Disbursal Date","Sanctioned","Service Charge (Rs.)","Net Disbursed","Interest%","Tenure","Total Interest","Total Payable","Total Paid","Deduction","Pending","Late Pmts","Missed Days","Status","NPA","NPA Date","Flagged By","Collector"];
+    const lr=loans.map(l=>[l.sl,l.loanId,l.loanType||"",fmtDDMMYYYY(l.applicationDate),fmtDDMMYYYY(l.loanDate),l.loanAmount,l.processingFee,l.netDisbursed,l.interestRate+"%",l.tenure,l.totalInterest,l.totalPayable,l.totalPaid,l.totalDeduction,l.pending,l.latePayments,l.missedStreak,l.status,l.isNPA?"YES":"No",fmtDDMMYYYY(l.npaDate),l.npaFlaggedBy,l.collectorName]);
+    const ws2=XLSX.utils.aoa_to_sheet([lh,...lr]);ws2["!cols"]=lh.map(()=>({wch:18}));
+    XLSX.utils.book_append_sheet(wb,ws2,"Loan Details");
+    const ph=["Sl","Date","Loan ID","Opening Bal","Daily Paid","Principal","Interest","Deduction","Other","Total Rcvd","Remaining","Days Late","Mode","Collected By","Txn ID"];
+    const pr=payments.map(p=>[p.sl,fmtDDMMYYYY(p.paymentDate),p.loanIdDisplay||p.loanId,p.openingBalance,p.dailyPayment,p.principalPaid,p.interestPaid,p.deductionAmount,p.otherCharges,p.totalReceived,p.remainingBalance,p.daysLate||0,p.paymentMode,p.collectedBy,p.transactionId]);
+    const ws3=XLSX.utils.aoa_to_sheet([ph,...pr]);ws3["!cols"]=ph.map(()=>({wch:16}));
+    XLSX.utils.book_append_sheet(wb,ws3,"Daily Payments");
+    const dh=["Date","Loan ID","Type","Description","Amount","Reason","Approved By"];
+    const dr=deductions.map(d=>[fmtDDMMYYYY(d.deductionDate),d.loanId,d.deductionType,d.description,d.deductionAmount,d.reason,d.approvedBy]);
+    const ws4=XLSX.utils.aoa_to_sheet([dh,...dr]);ws4["!cols"]=dh.map(()=>({wch:20}));
+    XLSX.utils.book_append_sheet(wb,ws4,"Deductions");
+    const nh=["Loan ID","Loan Amount","Disbursal Date","NPA Date","Flagged By","Missed Streak","Pending","Status"];
+    const nr=(npaHistory||[]).map(n=>[n.loanId,n.loanAmount,fmtDDMMYYYY(n.disbursalDate),fmtDDMMYYYY(n.npaDate),n.flaggedBy,n.missedStreak,n.pendingAmount,n.currentStatus]);
+    const ws5=XLSX.utils.aoa_to_sheet([nh,...nr]);ws5["!cols"]=nh.map(()=>({wch:18}));
+    XLSX.utils.book_append_sheet(wb,ws5,"NPA History");
+    const lph=["Loan ID","Loan Amount","Disbursal","Tenure","On Time","Late","Missed","Streak","Status"];
+    const lpr=(latePaymentSummary||[]).map(l=>[l.loanId,l.loanAmount,fmtDDMMYYYY(l.disbursalDate),l.tenure,l.paidOnTime,l.paidLate,l.missedDays,l.currentStreak,l.status]);
+    const ws6=XLSX.utils.aoa_to_sheet([lph,...lpr]);ws6["!cols"]=lph.map(()=>({wch:16}));
+    XLSX.utils.book_append_sheet(wb,ws6,"Late Payments");
+    XLSX.writeFile(wb,"Customer-Report-"+member.name+"-"+member.memberId+".xlsx");
+  }
+  async function exportAllCustomersExcel(){
+    setAllCustLoading(true);
+    try{
+      const rows=await api.getAllCustomersLoans();
+      const headers=["Sl.","Customer Name","Customer ID","Loan ID","Loan Date","Sanctioned (Rs.)","Service Charge (Rs.)","Net Disbursed (Rs.)","Interest %","Duration","Total Interest (Rs.)","Total Payable (Rs.)","Total Paid (Rs.)","Deduction (Rs.)","Pending (Rs.)","Late Pmts","Missed Days","NPA","Status","Collector"];
+      const data=rows.map(r=>[
+        r.sl,r.customerName,r.customerId,r.loanId,fmtDDMMYYYY(r.loanDate),
+        Number(r.loanAmount||0),
+        Number(r.processingFee||0),
+        Number(r.netDisbursed||0),
+        r.interestRate+"%",r.tenure+" days",
+        Number(r.totalInterest||0),Number(r.totalPayable||0),Number(r.totalPaid||0),Number(r.totalDeduction||0),Number(r.pending||0),
+        r.latePayments,r.missedStreak,r.isNPA?"YES":"No",r.status,r.collectorName
+      ]);
+      const wb=XLSX.utils.book_new();
+      const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+      ws["!cols"]=headers.map(()=>({wch:22}));
+      XLSX.utils.book_append_sheet(wb,ws,"All Customers");
+      XLSX.writeFile(wb,"All-Customers-Report-"+new Date().toISOString().slice(0,10)+".xlsx");
+    }catch(e){alert("Failed: "+e.message);}
+    finally{setAllCustLoading(false);}
+  }
+  const s=report&&report.summary;
+  const LOAN_COLS=[{key:"loanId",label:"Loan ID"},{key:"loanDate",label:"Loan Date"},{key:"loanAmount",label:"Loan Amount"},{key:"interestRate",label:"Interest Rate"},{key:"tenure",label:"Duration"},{key:"totalInterest",label:"Total Interest"},{key:"totalPayable",label:"Total Payable"},{key:"totalPaid",label:"Total Paid"},{key:"totalDeduction",label:"Deduction"},{key:"pending",label:"Pending"},{key:"status",label:"Status"}];
+  const PAY_COLS=[{key:"sl",label:"Sl."},{key:"paymentDate",label:"Date"},{key:"loanIdDisplay",label:"Loan ID"},{key:"openingBalance",label:"Opening Bal"},{key:"dailyPayment",label:"Daily Paid"},{key:"principalPaid",label:"Principal"},{key:"interestPaid",label:"Interest"},{key:"deductionAmount",label:"Deduction"},{key:"otherCharges",label:"Other"},{key:"totalReceived",label:"Total Rcvd"},{key:"remainingBalance",label:"Remaining"},{key:"paymentMode",label:"Mode"},{key:"collectedBy",label:"Collected By"},{key:"transactionId",label:"Txn ID"}];
+  const DED_COLS=[{key:"deductionDate",label:"Date"},{key:"loanId",label:"Loan ID"},{key:"deductionType",label:"Type"},{key:"description",label:"Description"},{key:"deductionAmount",label:"Amount"},{key:"reason",label:"Reason"},{key:"approvedBy",label:"Approved By"}];
+  return (
+    <div>
+      <div style={{position:"relative",marginBottom:20}}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{position:"relative",flex:1,minWidth:280}}>
+            <input ref={searchRef} className="search" style={{width:"100%",marginBottom:0,paddingLeft:36}} placeholder="Search by name, mobile or Customer ID..." value={query} onChange={e=>{setQuery(e.target.value);setSelectedMember(null);}} autoComplete="off" />
+            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:16,pointerEvents:"none"}}>&#128269;</span>
+            {suggestions.length>0&&(
+              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid var(--line)",borderRadius:10,boxShadow:"0 4px 20px rgba(0,0,0,.12)",zIndex:100,maxHeight:280,overflowY:"auto"}}>
+                {suggestions.map(m=>(
+                  <div key={m.memberId} onClick={()=>selectMember(m)} style={{padding:"10px 16px",cursor:"pointer",borderBottom:"1px solid var(--line)",display:"flex",justifyContent:"space-between",alignItems:"center"}} onMouseEnter={e=>e.currentTarget.style.background="var(--g50,#f4faf6)"} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                    <div><div style={{fontWeight:600,fontSize:14}}>{m.name}</div><div style={{fontSize:12,color:"var(--muted)"}}>{m.memberId} &middot; {m.mobile}</div></div>
+                    <span style={{fontSize:11,color:"var(--muted)",background:"var(--line)",borderRadius:20,padding:"2px 8px"}}>Select</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedMember&&(<button className="btn sm" onClick={()=>loadReport(selectedMember.memberId)} disabled={loading}>{loading?"Loading...":"Generate Report"}</button>)}
+          <button className="btn sm outline" onClick={exportAllCustomersExcel} disabled={allCustLoading}>{allCustLoading?"Exporting...":"Export All Customers Excel"}</button>
+        </div>
+      </div>
+      {loading&&<div className="panel pad" style={{textAlign:"center",padding:40}}><p className="muted">Loading customer report...</p></div>}
+      {!loading&&!report&&!selectedMember&&(
+        <div className="panel pad" style={{textAlign:"center",padding:60}}>
+          <div style={{fontSize:48,marginBottom:12}}>&#128269;</div>
+          <p className="muted">Search for a customer to view their complete loan history and generate a report.</p>
+        </div>
+      )}
+      {report&&(
+        <>
+          <div className="panel" style={{padding:"18px 20px",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontSize:20,fontWeight:800,marginBottom:4}}>{report.member.name}</div>
+                <div style={{fontSize:13,color:"var(--muted)",display:"flex",gap:16,flexWrap:"wrap"}}>
+                  <span>ID: {report.member.memberId}</span>
+                  <span>Mobile: {report.member.mobile}</span>
+                  {report.member.address&&<span>Address: {report.member.address}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn sm" onClick={exportIndividualExcel}>Export Excel</button>
+                <button className="btn sm outline" onClick={()=>printPDF("Individual Customer Report",report.member.name+" - "+report.member.memberId,LOAN_COLS,report.loans.map(l=>({...l,loanAmount:fmtINR(l.loanAmount),totalInterest:fmtINR(l.totalInterest),totalPayable:fmtINR(l.totalPayable),totalPaid:fmtINR(l.totalPaid),totalDeduction:ftINR(l.totalDeduction),pending:fmtINR(l.pending),loanDate:fmtDDMMYYYY(l.loanDate)})),[])}>Print PDF</button>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginTop:16}}>
+              {[
+                ["Total Loans",s.totalLoans,"#1f7a45"],
+                ["Active Loans",s.activeLoans,"#1f7a45"],
+                ["Closed Loans",s.closedLoans,"#555"],
+                ["NPA Loans",s.npaLoans||0,s.npaLoans>0?"#a61f1a":"#555"],
+                ["Total Borrowed",fmtINR(s.totalBorrowed),"#1f7a45"],
+                ["Service Charge",fmtINR(s.totalProcessingFees||0),"#8a5a00"],
+                ["Total Paid",fmtINR(s.totalPaid),"#1f7a45"],
+                ["Total Pending",fmtINR(s.totalPending),s.totalPending>0?"#a61f1a":"#1f7a45"],
+                ["Late Payments",s.totalLatePayments||0,s.totalLatePayments>0?"#a61f1a":"#555"],
+              ].map(([label,value,color])=>(
+                <div key={label} className="kpi" style={{borderLeft:"4px solid "+color}}>
+                  <div className="eb">{label}</div>
+                  <div className="v" style={{color}}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)",marginBottom:14,flexWrap:"wrap"}}>
+            {[["loans","Loan History"],["payments","Daily Collections"],["deductions","Deductions (incl. Service Charge)"],["npa","NPA History"],["late","Late Payments"],["pending","Pending Details"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setSubTab(k)} style={{padding:"8px 16px",border:0,borderBottom:subTab===k?"2px solid var(--g800)":"2px solid transparent",background:"transparent",fontWeight:subTab===k?700:400,cursor:"pointer",fontSize:12,marginBottom:-2,whiteSpace:"nowrap"}}>{l}</button>
+            ))}
+          </div>
+          {subTab==="loans"&&(
+            report.loans.length===0
+              ?<div className="panel pad" style={{textAlign:"center",padding:30}}><p className="muted">No loans found.</p></div>
+              :<div className="panel scroll-x">
+                  <table className="dtable">
+                    <thead><tr><th>Sl.</th><th>Loan ID</th><th>Loan Date</th><th>Sanctioned</th><th>Service Charge (Rs.)</th><th>Net Disbursed</th><th>Interest %</th><th>Duration</th><th>Total Interest</th><th>Total Payable</th><th>Total Paid</th><th>Deduction</th><th>Pending</th><th>Late Pmts</th><th>Missed Days</th><th>NPA</th><th>Status</th><th>Collector</th></tr></thead>
+                    <tbody>{report.loans.map((l,i)=>(
+                      <tr key={i} style={{background:l.isNPA?"rgba(166,31,26,.06)":l.pending<=0?"rgba(31,122,69,.06)":"transparent"}}>
+                        <td className="mono">{l.sl||i+1}</td>
+                        <td className="mono" style={{fontSize:12}}>{l.loanId}</td>
+                        <td className="mono" style={{fontSize:12}}>{fmtDDMMYYYY(l.loanDate)}</td>
+                        <td className="r mono">{fmtINR(l.loanAmount)}</td>
+                        <td className="r mono" style={{color:"var(--red-tx)",fontWeight:700}}>{l.processingFee>0?fmtINR(l.processingFee):"--"}</td>
+                        <td className="r mono" style={{color:"var(--green-tx)"}}>{fmtINR(l.netDisbursed)}</td>
+                        <td className="r mono">{l.interestRate}%</td>
+                        <td className="r mono">{l.tenure} days</td>
+                        <td className="r mono">{fmtINR(l.totalInterest)}</td>
+                        <td className="r mono">{fmtINR(l.totalPayable)}</td>
+                        <td className="r mono" style={{color:"var(--green-tx)",fontWeight:700}}>{fmtINR(l.totalPaid)}</td>
+                        <td className="r mono">{fmtINR(l.totalDeduction)}</td>
+                        <td className="r mono" style={{color:l.pending>0?"var(--red-tx)":"var(--green-tx)",fontWeight:700}}>{fmtINR(l.pending)}</td>
+                        <td className="r mono" style={{color:l.latePayments>0?"var(--red-tx)":"inherit"}}>{l.latePayments||0}</td>
+                        <td className="r mono" style={{color:l.missedStreak>0?"var(--red-tx)":"inherit"}}>{l.missedStreak||0}</td>
+                        <td>{l.isNPA?<Pill c="red">NPA</Pill>:<Pill c="grey">No</Pill>}</td>
+                        <td><Pill c={l.pending<=0?"green":l.status==="Disbursed"?"yellow":"grey"}>{l.pending<=0?"Closed":l.status}</Pill></td>
+                        <td style={{fontSize:12}}>{l.collectorName}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                  {report.loans.length>1&&(
+                    <div style={{padding:"10px 16px",background:"var(--g50,#f4faf6)",borderTop:"1px solid var(--line)",fontSize:13,display:"flex",gap:24,flexWrap:"wrap"}}>
+                      <span>Total Loans: <b>{report.loans.length}</b></span>
+                      <span>Total Sanctioned: <b>{fmtINR(report.loans.reduce((s,l)=>s+l.loanAmount,0))}</b></span>
+                      <span>Service Charge: <b style={{color:"var(--red-tx)"}}>{fmtINR(report.loans.reduce((s,l)=>s+l.processingFee,0))}</b></span>
+                      <span>Total Paid: <b style={{color:"var(--green-tx)"}}>{fmtINR(report.loans.reduce((s,l)=>s+l.totalPaid,0))}</b></span>
+                      <span>Total Pending: <b style={{color:"var(--red-tx)"}}>{fmtINR(report.loans.reduce((s,l)=>s+l.pending,0))}</b></span>
+                    </div>
+                  )}
+                </div>
+          )}
+          {subTab==="payments"&&(
+            report.payments.length===0
+              ?<div className="panel pad" style={{textAlign:"center",padding:30}}><p className="muted">No payment records found.</p></div>
+              :<div className="panel scroll-x">
+                  <table className="dtable">
+                    <thead><tr>{PAY_COLS.map(c=><th key={c.key}>{c.label}</th>)}<th>Days Late</th></tr></thead>
+                    <tbody>{report.payments.map((p,i)=>(
+                      <tr key={i} style={{background:p.isLate?"rgba(166,31,26,.04)":"transparent"}}>
+                        <td className="mono">{p.sl}</td>
+                        <td className="mono" style={{fontSize:12}}>{fmtDDMMYYYY(p.paymentDate)}</td>
+                        <td className="mono" style={{fontSize:12}}>{p.loanIdDisplay||p.loanId}</td>
+                        <td className="r mono">{fmtINR(p.openingBalance)}</td>
+                        <td className="r mono" style={{color:"var(--green-tx)",fontWeight:700}}>{fmtINR(p.dailyPayment)}</td>
+                        <td className="r mono">{fmtINR(p.principalPaid)}</td>
+                        <td className="r mono">{fmtINR(p.interestPaid)}</td>
+                        <td className="r mono">{fmtINR(p.deductionAmount)}</td>
+                        <td className="r mono">{fmtINR(p.otherCharges)}</td>
+                        <td className="r mono" style={{fontWeight:700}}>{fmtINR(p.totalReceived)}</td>
+                        <td className="r mono" style={{color:p.remainingBalance>0?"var(--red-tx)":"var(--green-tx)"}}>{fmtINR(p.remainingBalance)}</td>
+                        <td>{p.paymentMode}</td>
+                        <td>{p.collectedBy}</td>
+                        <td className="mono" style={{fontSize:11}}>{p.transactionId}</td>
+                        <td className="r mono" style={{color:p.daysLate>0?"var(--red-tx)":"var(--green-tx)",fontWeight:p.daysLate>0?700:400}}>{p.daysLate>0?"+"+p.daysLate+" days":"On time"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+          )}
+          {subTab==="deductions"&&(
+            report.deductions.length===0
+              ?<div className="panel pad" style={{textAlign:"center",padding:30}}><p className="muted">No deduction records found.</p></div>
+              :<>
+                  <div style={{padding:"8px 0 12px",fontSize:13,color:"var(--muted)"}}>Showing all deductions including service charges deducted at loan disbursal.</div>
+                  <div className="panel scroll-x">
+                    <table className="dtable">
+                      <thead><tr>{DED_COLS.map(c=><th key={c.key}>{c.label}</th>)}</tr></thead>
+                      <tbody>{report.deductions.map((d,i)=>(
+                        <tr key={i} style={{background:d.deductionType==="Processing Fee"?"rgba(138,90,0,.05)":"transparent"}}>
+                          <td className="mono" style={{fontSize:12}}>{fmtDDMMYYYY(d.deductionDate)}</td>
+                          <td className="mono" style={{fontSize:12}}>{d.loanId}</td>
+                          <td><b style={{color:d.deductionType==="Processing Fee"?"#8a5a00":"inherit"}}>{d.deductionType}</b></td>
+                          <td style={{fontSize:12}}>{d.description}</td>
+                          <td className="r mono" style={{color:"var(--red-tx)",fontWeight:700}}>{fmtINR(d.deductionAmount)}</td>
+                          <td style={{fontSize:12}}>{d.reason}</td>
+                          <td>{d.approvedBy}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </>
+          )}
+          {subTab==="npa"&&(
+            !report.npaHistory||report.npaHistory.length===0
+              ?<div className="panel pad" style={{textAlign:"center",padding:40}}><div style={{fontSize:36,marginBottom:8}}>&#9989;</div><p className="muted">No NPA history. This customer has no loans flagged as Non-Performing Assets.</p></div>
+              :<div className="panel scroll-x">
+                  <table className="dtable">
+                    <thead><tr><th>Loan ID</th><th>Loan Amount</th><th>Disbursal Date</th><th>NPA Date</th><th>Flagged By</th><th>Missed Streak</th><th>Pending Amount</th><th>Current Status</th></tr></thead>
+                    <tbody>{report.npaHistory.map((n,i)=>(
+                      <tr key={i} style={{background:"rgba(166,31,26,.05)"}}>
+                        <td className="mono" style={{fontSize:12}}>{n.loanId}</td>
+                        <td className="r mono">{fmtINR(n.loanAmount)}</td>
+                        <td className="mono" style={{fontSize:12}}>{fmtDDMMYYYY(n.disbursalDate)}</td>
+                        <td className="mono" style={{fontSize:12,color:"var(--red-tx)",fontWeight:700}}>{fmtDDMMYYYY(n.npaDate)||"--"}</td>
+                        <td>{n.flaggedBy}</td>
+                        <td className="r mono" style={{color:"var(--red-tx)",fontWeight:700}}>{n.missedStreak} days</td>
+                        <td className="r mono" style={{color:"var(--red-tx)",fontWeight:700}}>{fmtINR(n.pendingAmount)}</td>
+                        <td><Pill c="red">{n.currentStatus}</Pill></td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+          )}
+          {subTab==="late"&&(
+            !report.latePaymentSummary||report.latePaymentSummary.length===0
+              ?<div className="panel pad" style={{textAlign:"center",padding:40}}><p className="muted">No late payment data available.</p></div>
+              :<>
+                  {report.latePaymentSummary.map((l,i)=>(
+                    <div key={i} className="panel" style={{marginBottom:14,overflow:"hidden"}}>
+                      <div style={{padding:"12px 16px",background:"var(--g50,#f4faf6)",borderBottom:"1px solid var(--line)",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                        <div>
+                          <span style={{fontWeight:700,fontSize:14}}>{l.loanId}</span>
+                          <span style={{marginLeft:12,fontSize:12,color:"var(--muted)"}}>Disbursed: {fmtDDMMYYYY(l.disbursalDate)} &middot; {l.tenure} days</span>
+                        </div>
+                        <div style={{display:"flex",gap:16,fontSize:13,flexWrap:"wrap"}}>
+                          <span style={{color:"var(--green-tx)"}}>On Time: <b>{l.paidOnTime}</b></span>
+                          <span style={{color:l.paidLate>0?"var(--red-tx)":"inherit"}}>Late: <b>{l.paidLate}</b></span>
+                          <span style={{color:l.missedDays>0?"var(--red-tx)":"inherit"}}>Missed: <b>{l.missedDays}</b></span>
+                          <span style={{color:l.currentStreak>0?"var(--red-tx)":"inherit"}}>Streak: <b>{l.currentStreak}</b></span>
+                          <Pill c={l.status==="NPA"?"red":l.status==="Disbursed"?"yellow":"grey"}>{l.status}</Pill>
+                        </div>
+                      </div>
+                      {l.lateDetails&&l.lateDetails.length>0&&(
+                        <table className="dtable">
+                          <thead><tr><th>Payment Date</th><th>Amount</th><th>Days Late</th><th>Collected By</th></tr></thead>
+                          <tbody>{l.lateDetails.map((d,j)=>(
+                            <tr key={j} style={{background:"rgba(166,31,26,.04)"}}>
+                              <td className="mono" style={{fontSize:12}}>{fmtDDMMYYYY(d.paymentDate)}</td>
+                              <td className="r mono">{fmtINR(d.amount)}</td>
+                              <td className="r mono" style={{color:"var(--red-tx)",fontWeight:700}}>+{d.daysLate} days late</td>
+                              <td>{d.collectedBy}</td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      )}
+                      {(!l.lateDetails||l.lateDetails.length===0)&&<div style={{padding:"12px 16px",fontSize:13,color:"var(--green-tx)"}}>All payments for this loan were made on time.</div>}
+                    </div>
+                  ))}
+                </>
+          )}
+          {subTab==="pending"&&(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>{[["Total Principal Pending",s.totalPrincipalPending,s.totalPrincipalPending>0?"#a61f1a":"#1f7a45"],["Total Interest Pending",s.totalInterestPending,s.totalInterestPending>0?"#a61f1a":"#1f7a45"],["Other Pending Charges",s.otherPendingCharges,"#8a5a00"],["Total Amount Paid",s.totalPaid,"#1f7a45"],["Total Deductions",s.totalDeductions,"#8a5a00"],["Grand Total Pending",s.grandTotalPending,s.grandTotalPending>0?"#a61f1a":"#1f7a45"]].map(([label,value,color])=>(<div key={label} className="kpi" style={{borderLeft:"4px solid "+color}}><div className="eb">{label}</div><div className="v" style={{color,fontSize:22,fontWeight:800}}>{fmtINR(value)}</div></div>))}</div>)}
+        </>
+      )}
+    </div>
+  );
+}
+const REPORT_TABS=[{key:"customer",label:"Individual Customer",icon:"👤"},{key:"summary",label:"Summary",icon:"📊"},{key:"daily",label:"Daily",icon:"📅"},{key:"weekly",label:"Weekly",icon:"🗓️"},{key:"monthly",label:"Monthly",icon:"📆"},{key:"defaulters",label:"Due and Defaulters",icon:"⚠️"},{key:"paid",label:"Paid Members",icon:"✅"},{key:"collector",label:"Collector-wise",icon:"🧑‍💼"},{key:"closing",label:"Closing Report",icon:"🔒"},{key:"loandetails",label:"Loan Details",icon:"📋"}];
+export function Reports(){const [tab,setTab]=useState("customer");return(<><div className="a-title"><div><h1>Reports</h1><p>Individual Customer Reports</p></div></div><div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)",marginBottom:20,flexWrap:"wrap"}}>{REPORT_TABS.map(t=>(<button key={t.key} onClick={()=>setTab(t.key)} style={{padding:"10px 18px",border:0,borderBottom:tab===t.key?"2px solid var(--g800)":"2px solid transparent",background:"transparent",fontWeight:tab===t.key?700:400,cursor:"pointer",fontSize:13,marginBottom:-2,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}><span>{t.icon}</span>{t.label}</button>))}</div>{tab==="customer"&&<IndividualCustomerReport/>}{tab==="summary"&&<ReportSummary/>}{tab==="daily"&&<DailyReport/>}{tab==="weekly"&&<WeeklyReport/>}{tab==="monthly"&&<MonthlyReport/>}{tab==="defaulters"&&<DefaultersReport/>}{tab==="paid"&&<PaidMembersReport/>}{tab==="collector"&&<CollectorWiseReport/>}{tab==="closing"&&<ClosingReport/>}{tab==="loandetails"&&<LoanDetailsReport/>}</>);}

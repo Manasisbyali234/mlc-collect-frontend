@@ -78,11 +78,16 @@ export const api = {
   getReportLoanDetails: (params={}) => { const qs=new URLSearchParams(params).toString(); return req('GET', `/reports/loan-details${qs?'?'+qs:''}`); },
 
   getMissedEmi: () => req('GET', '/reports/missed-emi'),
+  getCustomerReport: (memberId) => req('GET', `/reports/customer/${memberId}`),
+  getAllCustomersSummary: () => req('GET', '/reports/all-customers-summary'),
+  getAllCustomersLoans: () => req('GET', '/reports/all-customers-loans'),
 
   getSanctionLetters: () => req('GET', '/sanction-letters'),
   getSanctionLetter: (id) => req('GET', `/sanction-letters/${id}`),
   updateSanctionLetter: (id, data) => req('PATCH', `/sanction-letters/${id}`, data),
   regenerateSanctionLetter: (id) => req('POST', `/sanction-letters/${id}/regenerate`, {}),
+
+  getLedger: (memberId, params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/ledger/${memberId}${qs ? '?' + qs : ''}`); },
 
   borrowerLogin: (appId, mobile) => req('POST', '/borrower/login', { appId, mobile }),
   getBorrowerDashboard: (appId) => req('GET', `/borrower/dashboard/${appId}`),
