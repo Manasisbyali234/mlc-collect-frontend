@@ -6,9 +6,10 @@ import BorrowerDashboard from './BorrowerDashboard.jsx';
 import CollectorLayout from './collector/CollectorLayout.jsx';
 import {
   Home, Collect, Customer, Record, LoanAccount, Deposit, DepositHistory, Targets,
-  LoanCollection, NewMemberForm, LoanApplicationForm,
+  LoanCollection, NewMemberForm, LoanApplicationForm, CustomerProfileDetail,
 } from './collector/Screens.jsx';
 import { Defaulters } from './collector/DefaultersScreen.jsx';
+import { NPAList } from './collector/NPAListScreen.jsx';
 import AdminLayout from './admin/AdminLayout.jsx';
 import SubAdminLayout from './admin/SubAdminLayout.jsx';
 import {
@@ -242,6 +243,7 @@ export default function App() {
       <Route path="/app" element={<RequireCollector><CollectorLayout /></RequireCollector>}>
         <Route index element={<Home />} />
         <Route path="collect" element={<Collect />} />
+        <Route path="collect/member/:memberId" element={<CustomerProfileDetail />} />
         <Route path="customers" element={<Customer />} />
         <Route path="record" element={<Record />} />
         <Route path="loan" element={<LoanAccount />} />
@@ -252,6 +254,7 @@ export default function App() {
         <Route path="loan-collection/new-member" element={<NewMemberForm />} />
         <Route path="loan-collection/apply/:memberId" element={<LoanApplicationForm />} />
         <Route path="defaulters" element={<Defaulters />} />
+        <Route path="npa" element={<NPAList />} />
       </Route>
 
       <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>

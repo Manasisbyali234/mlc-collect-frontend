@@ -5,6 +5,7 @@ const tabs = [
   { to: '/app', label: 'Home', end: true, icon: '🏠' },
   { to: '/app/collect', label: 'Collect', icon: '📋' },
   { to: '/app/defaulters', label: 'Not Paid', icon: '⚠️' },
+  { to: '/app/npa', label: 'NPA List', icon: '🚨' },
   { to: '/app/customers', label: 'Customers', icon: '👥' },
   { to: '/app/deposit', label: 'Deposit', icon: '🏦' },
   { to: '/app/deposit-history', label: 'Deposit History', icon: '📒' },

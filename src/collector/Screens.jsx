@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
+export { default as CustomerProfileDetail } from './CustomerProfileDetail.jsx';
+export { default as LoanReportPage } from './LoanReportPage.jsx';
 export { LoanCollection, NewMemberForm, LoanApplicationForm } from './LoanCollectionScreens.jsx';
 function PageHeader({ title, sub, children }) {
   return (
@@ -79,6 +81,7 @@ export function Collect() {
   const [payPhotoPreview, setPayPhotoPreview] = useState(null);
   const [payLocation, setPayLocation] = useState(null);
   const [locLoading, setLocLoading] = useState(false);
+  const nav = useNavigate();
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
   const todayKey = new Date().toLocaleDateString('en-IN');
 
@@ -172,6 +175,18 @@ export function Collect() {
     finally { setSaving(false); }
   }
 
+  function downloadCSV() {
+    const headers = ['Member Name', 'Member ID', 'App ID', 'Amount', 'Mode', 'Remarks', 'Date'];
+    const rows = collections.map(c => [
+      c.memberName, c.memberId, c.appId || '', c.amount, c.mode, c.reference || '', c.date
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `collections_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
   const totalCollected = collections.reduce((s, c) => s + (Number(c.amount) || 0), 0);
   const totalVerifiedDeposits = verifiedDeposits.reduce((s, d) => s + (Number(d.amount) || 0), 0);
   const total = Math.max(0, totalCollected - totalVerifiedDeposits);
@@ -183,12 +198,30 @@ export function Collect() {
 
   return (
     <>
-      <PageHeader title="Today's collections" sub={new Date().toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })}>
-        <button className="btn gold sm" onClick={() => openModal(null)}>+ Add Payment</button>
-      </PageHeader>
+      {/* Redesigned header */}
+      <div style={{
+        background: 'var(--g800)', color: '#fff', borderRadius: '0 0 20px 20px',
+        padding: '28px 28px 24px', marginBottom: 24,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16
+      }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Today's Collections</h1>
+          <p style={{ margin: '5px 0 0', color: '#cfe3d9', fontSize: 14 }}>
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {collections.length > 0 && (
+            <button className="btn sm outline" style={{ background: 'rgba(255,255,255,.12)', border: '1.5px solid rgba(255,255,255,.3)', color: '#fff' }} onClick={downloadCSV}>
+              ⬇ Download CSV
+            </button>
+          )}
+          <button className="btn gold sm" onClick={() => openModal(null)}>+ Add Payment</button>
+        </div>
+      </div>
 
       {loading ? (
-        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading</p></div>
+        <div className="panel pad" style={{ textAlign:'center', padding:48 }}><p className="muted">Loading…</p></div>
       ) : (
         <>
           {/* Disbursed loans table */}
@@ -201,13 +234,19 @@ export function Collect() {
                   const canCollect = ['Disbursed', 'Approved'].includes(a.status);
                   const sc = { Disbursed:'green', Approved:'green', Recovered:'grey', Recovery:'red', NPA:'red', Rejected:'red', Draft:'grey' };
                   return (
-                    <tr key={a.appId} style={{ background: paid ? 'var(--green-bg)' : 'transparent' }}>
-                      <td><b>{a.memberName}</b><div className="muted" style={{ fontSize:12 }}>{a.memberId}</div></td>
+                    <tr key={a.appId}
+                      style={{ background: paid ? 'var(--green-bg)' : 'transparent', cursor: 'pointer' }}
+                      onClick={() => nav('/app/collect/member/' + a.memberId)}
+                    >
+                      <td>
+                        <b style={{ color: 'var(--g800)', textDecoration: 'underline', cursor: 'pointer' }}>{a.memberName}</b>
+                        <div className="muted" style={{ fontSize:12 }}>{a.memberId}</div>
+                      </td>
                       <td className="mono" style={{ fontSize:12 }}>{a.appId}</td>
                       <td className="r mono">₹{Number(a.loanAmount).toLocaleString('en-IN')}</td>
                       <td><span className={'pill ' + (sc[a.status] || 'grey')}>{a.status}</span></td>
                       <td>{canCollect ? (paid ? <span className="pill green">✓ Collected</span> : <span className="pill yellow">Pending</span>) : <span className="pill grey">–</span>}</td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         {canCollect && !paid && (
                           <button className="btn sm gold" onClick={() => openModal(a)}>+ Collect</button>
                         )}

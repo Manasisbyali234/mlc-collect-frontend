@@ -59,10 +59,9 @@ export function LoanCollection() {
       await Promise.all(disbursed.map(async a => {
         try {
           const data = await api.getApplication(a.appId);
-          const totalDue = Number(data.pending !== undefined ? (data.totalPaid || 0) + (data.pending || 0) : data.loanAmount || 0);
+          const totalDue = Number(data.totalDue || data.loanAmount || 0);
           const totalPaid = Number(data.totalPaid || 0);
-          const paidPct = totalDue > 0 ? (totalPaid / totalDue) * 100 : 0;
-          console.log('LOAN STAT', a.appId, { totalPaid, totalDue, paidPct });
+          const paidPct = totalDue > 0 ? Math.min(100, (totalPaid / totalDue) * 100) : 0;
           stats[a.appId] = { totalPaid, totalDue, paidPct };
         } catch (err) { console.error('LOAN STAT ERROR', a.appId, err); }
       }));
@@ -364,32 +363,9 @@ export function LoanApplicationForm() {
     setDocs(p => ({ ...p, [k]: file }));
   }
 
-  function validateLoan() {
-    const e = {};
-    if (loan.amount !== FIXED_AMOUNT) e.amount = 'Amount must be Rs.5000';
-    if (!loan.tenure || +loan.tenure <= 0) e.tenure = 'Required';
-    if (!loan.purpose.trim()) e.purpose = 'Required';
-    return e;
-  }
-
-  function validateBank() {
-    const e = {};
-    if (!bank.holderName.trim()) e.holderName = 'Required';
-    if (!bank.bankName.trim()) e.bankName = 'Required';
-    if (!bank.accNo.trim()) e.accNo = 'Required';
-    if (bank.accNo !== bank.accNoConfirm) e.accNoConfirm = 'Account numbers do not match';
-    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bank.ifsc.toUpperCase())) e.ifsc = 'Valid IFSC required (e.g. KVGB0001234)';
-    return e;
-  }
-
-  function validateDocs() {
-    const e = {};
-    if (!docs.aadhaarFront) e.aadhaarFront = 'Required';
-    if (!docs.aadhaarBack) e.aadhaarBack = 'Required';
-    if (!docs.pan) e.pan = 'Required';
-    if (!docs.photo) e.photo = 'Required';
-    return e;
-  }
+  function validateLoan() { return {}; }
+  function validateBank() { return {}; }
+  function validateDocs() { return {}; }
 
   function buildRecord(status) {
     return { appId, memberId: member.memberId, memberName: member.name, mobile: member.mobile, loanType: loan.loanType, loanAmount: loan.amount, tenure: loan.tenure, rate: loan.rate, purpose: loan.purpose, interest, total, emi, bank, docs: Object.fromEntries(Object.entries(docs).filter(([,v])=>v).map(([k,v])=>[k,{name:v.name,size:v.size}])), date: new Date().toLocaleDateString('en-IN'), status, collectorName: user.name, collectorId: user.id, statusHistory:[{ status, date: new Date().toLocaleString(), by: user.name }] };
@@ -445,11 +421,11 @@ export function LoanApplicationForm() {
             <Field label='Application ID'><Inp value={appId} readOnly mono /></Field>
             <Field label='Member ID'><Inp value={member.memberId || memberId} readOnly mono /></Field>
             <Field label='Member Name'><Inp value={member.name || ''} readOnly /></Field>
-            <Field label='Loan Type' required><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
-            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} readOnly mono /><E k='amount' /></Field>
-            <Field label='Tenure (days)' required><Inp value={loan.tenure} readOnly mono /></Field>
+            <Field label='Loan Type'><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
+            <Field label='Loan Amount (Rs.)'><Inp value={loan.amount} readOnly mono /><E k='amount' /></Field>
+            <Field label='Tenure (days)'><Inp value={loan.tenure} readOnly mono /></Field>
             <Field label='Daily EMI (Rs.)'><Inp value={DAILY_EMI} readOnly mono /></Field>
-            <Field label='Loan Purpose' required><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /><E k='purpose' /></Field>
+            <Field label='Loan Purpose'><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /><E k='purpose' /></Field>
             <Field label='Collector'><Inp value={user.name} readOnly /></Field>
             <Field label='Collector ID'><Inp value={user.id} readOnly mono /></Field>
             <Field label='Date'><Inp value={new Date().toLocaleDateString('en-IN')} readOnly /></Field>
@@ -472,12 +448,12 @@ export function LoanApplicationForm() {
         <div className='panel pad' style={{ marginTop:18 }}>
           <SectionHead n='2' title='Bank Account Details' />
           <div className='form-grid fg3' style={{ gap:14 }}>
-            <Field label='Account Holder Name' required><Inp value={bank.holderName} onChange={setB('holderName')} /><E k='holderName' /></Field>
-            <Field label='Bank Name' required><Inp value={bank.bankName} onChange={setB('bankName')} /><E k='bankName' /></Field>
+            <Field label='Account Holder Name'><Inp value={bank.holderName} onChange={setB('holderName')} /><E k='holderName' /></Field>
+            <Field label='Bank Name'><Inp value={bank.bankName} onChange={setB('bankName')} /><E k='bankName' /></Field>
             <Field label='Branch Name'><Inp value={bank.branch} onChange={setB('branch')} /></Field>
-            <Field label='Account Number' required><Inp value={bank.accNo} onChange={setB('accNo')} mono /><E k='accNo' /></Field>
-            <Field label='Confirm Account Number' required><Inp value={bank.accNoConfirm} onChange={setB('accNoConfirm')} mono /><E k='accNoConfirm' /></Field>
-            <Field label='IFSC Code' required><Inp value={bank.ifsc} onChange={setB('ifsc')} mono placeholder='e.g. KVGB0001234' /><E k='ifsc' /></Field>
+            <Field label='Account Number'><Inp value={bank.accNo} onChange={setB('accNo')} mono /><E k='accNo' /></Field>
+            <Field label='Confirm Account Number'><Inp value={bank.accNoConfirm} onChange={setB('accNoConfirm')} mono /><E k='accNoConfirm' /></Field>
+            <Field label='IFSC Code'><Inp value={bank.ifsc} onChange={setB('ifsc')} mono placeholder='e.g. KVGB0001234' /><E k='ifsc' /></Field>
             <Field label='Account Type'><Sel value={bank.accType} onChange={setB('accType')}><option>Savings</option><option>Current</option></Sel></Field>
             <Field label='UPI ID (optional)'><Inp value={bank.upi} onChange={setB('upi')} mono /></Field>
           </div>
@@ -493,7 +469,7 @@ export function LoanApplicationForm() {
         <div className='panel pad' style={{ marginTop:18 }}>
           <SectionHead n='3' title='Document Upload' />
           <div className='form-grid fg3' style={{ gap:14 }}>
-            {[['aadhaarFront','Aadhaar Card - Front',true],['aadhaarBack','Aadhaar Card - Back',true],['pan','PAN Card',true],['passbook','Bank Passbook - First Page',false],['photo','Member Passport Photo',true],['addressProof','Address Proof',false],['nomineeId','Nominee ID Proof',false],['other','Other Documents',false]].map(([key, label, req]) => (
+            {[['aadhaarFront','Aadhaar Card - Front',false],['aadhaarBack','Aadhaar Card - Back',false],['pan','PAN Card',false],['passbook','Bank Passbook - First Page',false],['photo','Member Passport Photo',false],['addressProof','Address Proof',false],['nomineeId','Nominee ID Proof',false],['other','Other Documents',false]].map(([key, label, req]) => (
               <Field key={key} label={label} required={req}>
                 {docs[key] ? (
                   <div style={{ border:'1px solid var(--g800)', borderRadius:12, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--green-bg)' }}>

@@ -89,6 +89,8 @@ export const api = {
 
   getLedger: (memberId, params = {}) => { const qs = new URLSearchParams(params).toString(); return req('GET', `/ledger/${memberId}${qs ? '?' + qs : ''}`); },
 
+  getCollectorNPA: (collectorId) => req('GET', `/collector/npa?collectorId=${collectorId}`),
+
   borrowerLogin: (appId, mobile) => req('POST', '/borrower/login', { appId, mobile }),
   getBorrowerDashboard: (appId) => req('GET', `/borrower/dashboard/${appId}`),
 };
