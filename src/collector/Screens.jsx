@@ -195,6 +195,7 @@ export function Collect() {
   const loanAmount = appDetail ? Number(appDetail.loanAmount || 0) : 0;
   const totalPaid = appDetail ? Number(appDetail.totalPaid || 0) : 0;
   const collectedAppIds = new Set(collections.map(c => c.appId));
+  const loanCountByMember = disbursedApps.reduce((acc, a) => { acc[a.memberId] = (acc[a.memberId] || 0) + 1; return acc; }, {});
 
   return (
     <>
@@ -228,7 +229,7 @@ export function Collect() {
           {disbursedApps.length > 0 && (
             <div className="panel scroll-x" style={{ marginBottom: 18 }}>
               <table className="dtable">
-                <thead><tr><th>Member</th><th>App ID</th><th className="r">Loan Amount</th><th>Status</th><th>Today</th><th></th></tr></thead>
+                <thead><tr><th>Member</th><th>App ID</th><th className="r">Loan Amount</th><th>Loans</th><th>Status</th><th>Today</th><th></th></tr></thead>
                 <tbody>{disbursedApps.map(a => {
                   const paid = collectedAppIds.has(a.appId);
                   const canCollect = ['Disbursed', 'Approved'].includes(a.status);
@@ -244,6 +245,7 @@ export function Collect() {
                       </td>
                       <td className="mono" style={{ fontSize:12 }}>{a.appId}</td>
                       <td className="r mono">₹{Number(a.loanAmount).toLocaleString('en-IN')}</td>
+                      <td style={{ textAlign:'center' }}><span className='pill grey'>{loanCountByMember[a.memberId] || 1}</span></td>
                       <td><span className={'pill ' + (sc[a.status] || 'grey')}>{a.status}</span></td>
                       <td>{canCollect ? (paid ? <span className="pill green">✓ Collected</span> : <span className="pill yellow">Pending</span>) : <span className="pill grey">–</span>}</td>
                       <td onClick={e => e.stopPropagation()}>
@@ -279,13 +281,18 @@ export function Collect() {
                 </table>
               </div>
               <div className="panel pad">
-                <div className="row between">
-                  <div>
+                <div style={{ display: 'flex', gap: 0 }}>
+                  <div style={{ flex: 1, borderRight: totalVerifiedDeposits > 0 ? '1px solid var(--line)' : 'none', paddingRight: 24 }}>
                     <div className="eyebrow">Total collected (undeposited)</div>
                     <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px' }}>₹{total.toLocaleString('en-IN')}</div>
-                    {totalVerifiedDeposits > 0 && <div className="muted" style={{ fontSize: 12 }}>₹{totalVerifiedDeposits.toLocaleString('en-IN')} deposited &amp; verified</div>}
                   </div>
-                  <Link to="/app/deposit" className="btn gold" style={{ padding: '16px 32px', fontSize: 18 }}>Deposit →</Link>
+                  {totalVerifiedDeposits > 0 && (
+                    <div style={{ flex: 1, paddingLeft: 24 }}>
+                      <div className="eyebrow">Deposited &amp; verified</div>
+                      <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px', color: 'var(--green-tx)' }}>₹{totalVerifiedDeposits.toLocaleString('en-IN')}</div>
+                    </div>
+                  )}
+                  <Link to="/app/deposit" className="btn gold" style={{ alignSelf: 'center', padding: '16px 32px', fontSize: 18, marginLeft: 24 }}>Deposit →</Link>
                 </div>
               </div>
             </>
@@ -648,17 +655,39 @@ export function LoanAccount() {
 
 /* ---------- 6. Deposit ---------- */
 export function Deposit() {
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
   const [how, setHow] = useState('Cash');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
-  const [collectedFrom, setCollectedFrom] = useState('');
+  const [collectedFrom, setCollectedFrom] = useState(user.name || '');
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [location, setLocation] = useState(null);
   const [locLoading, setLocLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+  const [totalCollected, setTotalCollected] = useState(0);
+  const [totalVerified, setTotalVerified] = useState(0);
+  const [pendingDeposits, setPendingDeposits] = useState([]);
+  const [howErr, setHowErr] = useState('');
+  const [newLoanPersonName, setNewLoanPersonName] = useState('');
+
+  function loadDeposits() {
+    Promise.all([api.getCollections({ collectorId: user.id }), api.getDeposits()])
+      .then(([cols, deps]) => {
+        const tc = cols.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+        setTotalCollected(tc);
+        const myDeps = deps.filter(d => d.collectorId === user.id || d.collectorId === user.mobile || d.collectorName === user.name);
+        const verified = myDeps.filter(d => d.status === 'Verified');
+        const tv = verified.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+        setTotalVerified(tv);
+        setPendingDeposits(myDeps.filter(d => d.status === 'To verify'));
+        const net = Math.max(0, tc - tv);
+        if (net > 0) setAmount(String(Math.round(net / 500) * 500));
+      }).catch(() => {});
+  }
+
+  useEffect(() => { loadDeposits(); }, []);
 
   function captureLocation() {
     if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
@@ -680,6 +709,7 @@ export function Deposit() {
 
   async function handleSubmit() {
     if (!amount) { alert('Enter amount'); return; }
+    if (how === 'New Loan Person' && !newLoanPersonName.trim()) { alert('Enter new loan person name'); return; }
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -688,7 +718,7 @@ export function Deposit() {
       fd.append('amount', amount);
       fd.append('method', how);
       fd.append('reference', reference);
-      fd.append('collectedFrom', collectedFrom);
+      fd.append('collectedFrom', how === 'New Loan Person' ? newLoanPersonName : collectedFrom);
       fd.append('date', new Date().toLocaleDateString('en-IN'));
       fd.append('status', 'To verify');
       if (location) fd.append('location', JSON.stringify(location));
@@ -704,12 +734,93 @@ export function Deposit() {
       <div style={{ fontSize:64 }}>&#10003;</div>
       <h2 style={{ marginTop:16 }}>Deposit Submitted!</h2>
       <p className='muted'>Accountable Officer will verify your deposit.</p>
+      {how === 'New Loan Person' ? (
+        <div style={{ background:'var(--yellow-bg)', border:'2px solid var(--yellow-tx)', borderRadius:14, padding:'16px 20px', marginTop:20, textAlign:'left' }}>
+          <div style={{ fontWeight:700, color:'var(--yellow-tx)', fontSize:15, marginBottom:8 }}>⏳ Pending Admin Approval</div>
+          <div style={{ fontSize:14, color:'var(--g800)', marginBottom:6 }}>👤 <b>{how === 'New Loan Person' ? newLoanPersonName : collectedFrom}</b></div>
+          <div style={{ fontSize:13, color:'var(--muted)' }}>Amount: <b>₹{Number(amount).toLocaleString('en-IN')}</b></div>
+          {reference && <div style={{ fontSize:13, color:'var(--muted)', marginTop:4 }}>Ref: {reference}</div>}
+          <div style={{ fontSize:13, color:'var(--yellow-tx)', fontWeight:600, marginTop:10 }}>This deposit will remain pending until admin approves it. You can see its status on this page.</div>
+        </div>
+      ) : (
+        <div style={{ background:'var(--yellow-bg)', border:'1.5px solid var(--yellow-tx)', borderRadius:14, padding:'14px 20px', marginTop:20, textAlign:'left' }}>
+          <div style={{ fontWeight:700, color:'var(--yellow-tx)', fontSize:15, marginBottom:4 }}>⏳ Pending for Verification</div>
+          <div style={{ fontSize:13, color:'var(--muted)' }}>Your deposit of <b>₹{Number(amount).toLocaleString('en-IN')}</b> is awaiting admin verification.</div>
+        </div>
+      )}
+      <button className='btn gold' style={{ marginTop:20 }} onClick={() => { setSubmitted(false); setAmount(''); setReference(''); setNewLoanPersonName(''); setPhoto(null); setPhotoPreview(null); setLocation(null); loadDeposits(); }}>Submit Another</button>
     </div>
   );
+
+  const undeposited = Math.max(0, totalCollected - totalVerified);
 
   return (
     <>
       <PageHeader title="Deposit to society" sub={`Collection date ${new Date().toLocaleDateString('en-IN')}`} />
+
+      {pendingDeposits.filter(d => d.method === 'New Loan Person').map((d, i) => (
+        <div key={d.id || i} style={{ background:'var(--yellow-bg)', border:'2px solid var(--yellow-tx)', borderRadius:14, padding:'16px 18px', marginBottom:14 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <span style={{ fontSize:20 }}>⏳</span>
+            <div>
+              <div style={{ fontWeight:700, color:'var(--yellow-tx)', fontSize:15 }}>New Loan Person — Pending Admin Approval</div>
+              <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Submitted on {d.date} · waiting for admin to verify</div>
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, background:'rgba(255,255,255,.6)', borderRadius:10, padding:'12px 14px' }}>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em' }}>Person Name</div>
+              <div style={{ fontWeight:700, fontSize:15, marginTop:3 }}>👤 {d.collectedFrom || '–'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em' }}>Amount</div>
+              <div className='mono' style={{ fontWeight:700, fontSize:15, marginTop:3 }}>₹{Number(d.amount).toLocaleString('en-IN')}</div>
+            </div>
+            {d.reference && (
+              <div style={{ gridColumn:'1/-1' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em' }}>Reference / Loan ID</div>
+                <div className='mono' style={{ fontSize:13, marginTop:3 }}>{d.reference}</div>
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop:10, fontSize:13, color:'var(--yellow-tx)', fontWeight:600 }}>Admin will approve this deposit. You will see it verified once done.</div>
+        </div>
+      ))}
+
+      {pendingDeposits.filter(d => d.method !== 'New Loan Person').length > 0 && (
+        <div style={{ background:'var(--yellow-bg)', border:'1.5px solid var(--yellow-tx)', borderRadius:14, padding:'14px 18px', marginBottom:18 }}>
+          <div style={{ fontWeight:700, color:'var(--yellow-tx)', fontSize:15, marginBottom:10 }}>⏳ Pending for Verification ({pendingDeposits.filter(d => d.method !== 'New Loan Person').length})</div>
+          {pendingDeposits.filter(d => d.method !== 'New Loan Person').map((d, i) => (
+            <div key={d.id || i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,.08)', fontSize:14 }}>
+              <div>
+                <span style={{ fontWeight:600 }}>{d.method}</span>
+                {d.collectedFrom && <span style={{ color:'var(--muted)', fontSize:12, marginLeft:8 }}>from {d.collectedFrom}</span>}
+                <div style={{ fontSize:12, color:'var(--muted)' }}>{d.date}{d.reference ? ` · ${d.reference}` : ''}</div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span className='mono' style={{ fontWeight:700 }}>₹{Number(d.amount).toLocaleString('en-IN')}</span>
+                <span className='pill yellow'>To verify</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {totalCollected > 0 && (
+        <div className="panel pad" style={{ marginBottom: 18, display: 'flex', gap: 0 }}>
+          <div style={{ flex: 1, borderRight: totalVerified > 0 ? '1px solid var(--line)' : 'none', paddingRight: 24 }}>
+            <div className="eyebrow">Total collected (undeposited)</div>
+            <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px' }}>₹{undeposited.toLocaleString('en-IN')}</div>
+          </div>
+          {totalVerified > 0 && (
+            <div style={{ flex: 1, paddingLeft: 24 }}>
+              <div className="eyebrow">Deposited &amp; verified</div>
+              <div className="mono" style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 2px', color: 'var(--green-tx)' }}>₹{totalVerified.toLocaleString('en-IN')}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="cols">
         <div>
           <div className="panel pad" style={{ marginBottom: 18, background: 'var(--g900)', color: '#fff', borderColor: 'transparent' }}>
@@ -719,7 +830,12 @@ export function Deposit() {
           </div>
           <div className="panel pad" style={{ marginBottom: 18 }}>
             <div className="lbl">Collected from (person name)</div>
-            <input className="input" value={collectedFrom} onChange={e => setCollectedFrom(e.target.value)} placeholder="Name of person who paid" style={{ marginBottom: 18 }} />
+            <input className="input" value={collectedFrom} onChange={e => setCollectedFrom(e.target.value)} placeholder="Name of person who paid" style={{ marginBottom: collectedFrom ? 8 : 18 }} />
+            {collectedFrom && (
+              <div style={{ marginBottom: 18, padding: '8px 14px', background: 'var(--green-bg)', borderRadius: 10, fontSize: 14, fontWeight: 700, color: 'var(--g800)' }}>
+                👤 {collectedFrom}
+              </div>
+            )}
             <div className="lbl">Live location</div>
             {location ? (
               <div style={{ display:'flex', alignItems:'center', gap:10, border:'1px solid var(--g800)', borderRadius:12, padding:'10px 14px', background:'var(--green-bg)', marginBottom:14 }}>
@@ -749,11 +865,19 @@ export function Deposit() {
           <div className="panel pad">
             <div className="lbl">Amount deposited (₹)</div>
             <div className="amt-input"><span>₹</span><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></div>
-            <div className="chips" style={{ marginBottom: 18 }}>
+            <div className="chips" style={{ marginBottom: howErr ? 6 : 18 }}>
               {['Cash', 'UPI', 'New Loan Person', 'Handed to Office'].map((h) => (
-                <button key={h} className={`chip ${how === h ? 'active' : ''}`} onClick={() => setHow(h)}>{h}</button>
+                <button key={h} className={`chip ${how === h ? 'active' : ''}`} onClick={() => {
+                  if (h === 'New Loan Person' && Math.max(0, totalCollected - totalVerified) < 5000) {
+                    setHowErr('New Loan Person option requires ₹5,000+ undeposited amount.');
+                    return;
+                  }
+                  setHowErr('');
+                  setHow(h);
+                }}>{h}</button>
               ))}
             </div>
+            {howErr && <div style={{ color: 'var(--red-tx)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{howErr}</div>}
             {how === 'UPI' && (
               <>
                 <div className="lbl">UPI ID / Transaction ID</div>
@@ -762,8 +886,20 @@ export function Deposit() {
             )}
             {how === 'New Loan Person' && (
               <>
-                <div className="lbl">New Loan Person Name</div>
-                <input className="input" value={collectedFrom} onChange={e => setCollectedFrom(e.target.value)} placeholder="Name of new loan person" style={{ marginBottom: 18 }} />
+                <div className="lbl">New Loan Person Name <span style={{ color: 'var(--red-tx)' }}>*</span></div>
+                <input
+                  className="input"
+                  value={newLoanPersonName}
+                  onChange={e => setNewLoanPersonName(e.target.value)}
+                  placeholder="Enter new loan person name"
+                  style={{ marginBottom: newLoanPersonName ? 8 : 18 }}
+                  autoFocus
+                />
+                {newLoanPersonName && (
+                  <div style={{ marginBottom: 18, padding: '8px 14px', background: 'var(--green-bg)', borderRadius: 10, fontSize: 14, fontWeight: 700, color: 'var(--g800)' }}>
+                    👤 {newLoanPersonName}
+                  </div>
+                )}
                 <div className="lbl">Reference / Loan ID</div>
                 <input className="input mono" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. APP-XXXXXX or Loan ID" style={{ marginBottom: 18 }} />
               </>

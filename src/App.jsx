@@ -6,7 +6,7 @@ import BorrowerDashboard from './BorrowerDashboard.jsx';
 import CollectorLayout from './collector/CollectorLayout.jsx';
 import {
   Home, Collect, Customer, Record, LoanAccount, Deposit, DepositHistory, Targets,
-  LoanCollection, NewMemberForm, LoanApplicationForm, CustomerProfileDetail,
+  LoanCollection, NewMemberForm, LoanApplicationForm, CustomerProfileDetail, LoanReportPage,
 } from './collector/Screens.jsx';
 import { Defaulters } from './collector/DefaultersScreen.jsx';
 import { NPAList } from './collector/NPAListScreen.jsx';
@@ -244,6 +244,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="collect" element={<Collect />} />
         <Route path="collect/member/:memberId" element={<CustomerProfileDetail />} />
+        <Route path="collect/member/:memberId/report" element={<LoanReportPage />} />
         <Route path="customers" element={<Customer />} />
         <Route path="record" element={<Record />} />
         <Route path="loan" element={<LoanAccount />} />

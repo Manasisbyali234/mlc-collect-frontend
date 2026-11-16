@@ -6,6 +6,7 @@ const STATUS_ORDER = ['Pending Admin Approval','Under Review','Sanctioned','Appr
 const SC = { 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Sanctioned:'yellow', Approved:'green', Rejected:'red', Disbursed:'green', Draft:'grey', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
 const Pill = ({ c, children }) => <span className={'pill ' + c}>{children}</span>;
 function calcFee(amount) { return Math.floor(Number(amount) / 5000) * 250; }
+const fmtLoanType = t => (t || '').replace(/10%\s*flat/gi, '9% flat').replace(/^(Daily\s*55)\s*(-\s*)?$/i, 'Daily 55 - 9% flat');
 
 function fmtINR(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
 
@@ -50,12 +51,13 @@ function printApprovalLetter(app) {
   <div class="grid">
     <div class="kv"><span>Application ID</span><b>${app.appId}</b></div>
     <div class="kv"><span>Loan ID</span><b>${app.loanId || '–'}</b></div>
-    <div class="kv"><span>Loan Type</span><b>${app.loanType}</b></div>
+    <div class="kv"><span>Loan Type</span><b>${(app.loanType || '').replace(/10%\s*flat/gi, '9% flat').replace(/^(Daily\s*55)\s*$/, 'Daily 55 - 9% flat').replace(/^(Daily\s*55)\s*-\s*$/i, 'Daily 55 - 9% flat')}</b></div>
     <div class="kv"><span>Sanctioned Amount</span><b>${fmtINR(sanctionAmount)}</b></div>
     <div class="kv"><span>Processing Fee Deduction</span><b>- ${fmtINR(fee)}</b></div>
     <div class="kv"><span>Net Disbursal Amount</span><b>${fmtINR(net)}</b></div>
     <div class="kv"><span>Approved Tenure</span><b>${app.approvedTenure} days</b></div>
     <div class="kv"><span>Interest Rate</span><b>${app.confirmedRate}% per annum</b></div>
+    <div class="kv"><span>Door Step Collection Charge</span><b>Rs. 6.80 per day</b></div>
     <div class="kv"><span>Collector</span><b>${app.collectorName}</b></div>
     ${app.adminRemark ? `<div class="kv" style="grid-column:1/-1"><span>Admin Remark</span><b>${app.adminRemark}</b></div>` : ''}
   </div>
@@ -119,7 +121,7 @@ export function LoanApplications() {
                 <td><b>{a.memberName}</b><div className='muted' style={{ fontSize:12 }}>{a.memberId}</div></td>
                 <td className='mono'>{a.mobile}</td>
                 <td>{a.collectorName}</td>
-                <td>{a.loanType}</td>
+                <td>{fmtLoanType(a.loanType)}</td>
                 <td className='r mono'>Rs.{a.loanAmount}</td>
                 <td className='mono' style={{ fontSize:13 }}>{a.date}</td>
                 <td><Pill c={SC[a.status] || 'grey'}>{a.status}</Pill></td>
@@ -156,7 +158,7 @@ export function ApplicationDetail() {
     api.getApplication(appId).then(d => {
       setApp(d);
       setApprovedTenure(d.tenure || '');
-      setConfirmedRate(d.rate || '');
+      setConfirmedRate('9');
       setSanctionAmount(d.sanctionAmount || d.loanAmount || '');
       setServiceCharge(String(calcFee(d.sanctionAmount || d.loanAmount || 0)));
       if (d.memberId) api.getMember(d.memberId).then(setMember).catch(() => {});
@@ -264,7 +266,7 @@ export function ApplicationDetail() {
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>2 &middot; Loan Application Information</div>
             <div className='info-grid'>
-              {[['Loan Type',app.loanType],['Requested Amount','Rs.'+app.loanAmount],['Tenure',app.tenure+' days'],['Interest Rate',app.rate+'%'],['Interest','Rs.'+app.interest],['Total Repayable','Rs.'+app.total],['EMI','Rs.'+app.emi],['Purpose',app.purpose],['Application Date',app.date]].map(([k,v]) => (
+              {[['Loan Type',fmtLoanType(app.loanType)],['Requested Amount','Rs.'+app.loanAmount],['Tenure',app.tenure+' days'],['Interest Rate',app.rate+'%'],['Interest','Rs.'+app.interest],['Total Repayable','Rs.'+app.total],['EMI','Rs.'+app.emi],['Purpose',app.purpose],['Application Date',app.date]].map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono'>{v}</span></div>
               ))}
             </div>
@@ -446,7 +448,7 @@ export function ApplicationDetail() {
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Approved Tenure (days) <span style={{ color:'#f87171' }}>*</span></label>
                 <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} value={approvedTenure} onChange={e => setApprovedTenure(e.target.value)} placeholder='e.g. 55' />
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Confirm Interest Rate (%) <span style={{ color:'#f87171' }}>*</span></label>
-                <input className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8 }} value={confirmedRate} onChange={e => setConfirmedRate(e.target.value)} placeholder='e.g. 10' />
+                <div className='input mono' style={{ padding:'8px 12px', fontSize:14, marginBottom:8, opacity:.7, cursor:'not-allowed' }}>9%</div>
                 <label style={{ color:'#cfe3d9', fontSize:12, display:'block', marginBottom:4 }}>Verification Remarks</label>
                 <textarea className='input' style={{ padding:'8px 12px', fontSize:13, marginBottom:10, minHeight:50, resize:'vertical' }} value={remark} onChange={e => setRemark(e.target.value)} placeholder='Optional remarks' />
                 <button className='btn gold block' style={{ marginBottom:8 }} onClick={handleApprove}>Approve Loan</button>

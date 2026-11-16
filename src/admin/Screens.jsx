@@ -486,24 +486,27 @@ export function DepositVerification() {
   const [deposits, setDeposits] = useState([]);
   const [viewPhoto, setViewPhoto] = useState(null);
   const [updating, setUpdating] = useState(null);
+  const [detailDeposit, setDetailDeposit] = useState(null);
 
   function load() { api.getDeposits().then(setDeposits).catch(() => {}); }
   useEffect(load, []);
 
   async function handleStatus(id, status) {
     setUpdating(id);
-    try { await api.updateDeposit(id, { status }); load(); }
+    try { await api.updateDeposit(id, { status }); load(); if (detailDeposit?.id === id) setDetailDeposit(p => ({ ...p, status })); }
     catch (e) { alert(e.message); }
     finally { setUpdating(null); }
   }
 
   const pending = deposits.filter(d => d.status === 'To verify').length;
   const mismatches = deposits.filter(d => d.status === 'Mismatch').length;
+  const newLoanPersonPending = deposits.filter(d => d.method === 'New Loan Person' && d.status === 'To verify').length;
+
   return (
     <>
       <div className="a-title"><div><h1>Deposit verification</h1><p>Match each collector's deposit to the customer-wise collections for that day</p></div></div>
-      <div className="panel" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: 22, marginBottom: 18 }}>
-        {[['Waiting to verify', pending, ''], ['Mismatches', mismatches, '', 'var(--red-tx)'], ['Total deposits', deposits.length, 'all time']].map(([a, b, c, col]) => (
+      <div className="panel" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', padding: 22, marginBottom: 18 }}>
+        {[['Waiting to verify', pending, ''], ['New Loan Person', newLoanPersonPending, 'pending approval', 'var(--yellow-tx)'], ['Mismatches', mismatches, '', 'var(--red-tx)'], ['Total deposits', deposits.length, 'all time']].map(([a, b, c, col]) => (
           <div key={a}><div className="eyebrow" style={{ fontSize: 11 }}>{a}</div><div className="mono" style={{ fontSize: 28, fontWeight: 700, color: col }}>{b}</div><small className="muted">{c}</small></div>
         ))}
       </div>
@@ -513,30 +516,37 @@ export function DepositVerification() {
           <div style={{ padding:32, textAlign:'center' }}><p className="muted">No deposits submitted yet.</p></div>
         ) : (
           <table className="dtable">
-            <thead><tr><th>Collector</th><th>Collected From</th><th>Date</th><th className="r">Amount</th><th>Method</th><th>Reference</th><th>Location</th><th>Photo</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>Collector</th><th>Method / Person</th><th>Date</th><th className="r">Amount</th><th>Reference</th><th>Location</th><th>Photo</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
               {deposits.map((d) => (
-                <tr key={d.id}>
+                <tr key={d.id} style={{ background: d.method === 'New Loan Person' && d.status === 'To verify' ? 'var(--yellow-bg)' : 'transparent', cursor: 'pointer' }} onClick={() => setDetailDeposit(d)}>
                   <td><b>{d.collectorName}</b></td>
-                  <td>{d.collectedFrom || '–'}</td>
+                  <td>
+                    <span className={'pill ' + (d.method === 'New Loan Person' ? 'yellow' : d.method === 'Cash' ? 'green' : 'grey')} style={{ fontSize:11 }}>{d.method}</span>
+                    {d.method === 'New Loan Person' && d.collectedFrom && (
+                      <div style={{ fontSize:13, fontWeight:700, marginTop:3, color:'var(--g800)' }}>👤 {d.collectedFrom}</div>
+                    )}
+                    {d.method !== 'New Loan Person' && d.collectedFrom && (
+                      <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>{d.collectedFrom}</div>
+                    )}
+                  </td>
                   <td className="mono">{d.date}</td>
-                  <td className="r mono">₹{Number(d.amount).toLocaleString('en-IN')}</td>
-                  <td>{d.method}</td>
-                  <td className="mono" style={{ fontSize:13 }}>{d.reference}</td>
+                  <td className="r mono" style={{ fontWeight:700 }}>₹{Number(d.amount).toLocaleString('en-IN')}</td>
+                  <td className="mono" style={{ fontSize:13 }}>{d.reference || '–'}</td>
                   <td style={{ fontSize:12 }}>
                     {d.location ? (
-                      <a href={`https://maps.google.com/?q=${d.location.lat},${d.location.lng}`} target="_blank" rel="noreferrer" style={{ color:'var(--green-tx)' }}>
-                        📍 {d.location.lat}, {d.location.lng}
+                      <a href={`https://maps.google.com/?q=${d.location.lat},${d.location.lng}`} target="_blank" rel="noreferrer" style={{ color:'var(--green-tx)' }} onClick={e => e.stopPropagation()}>
+                        📍 View
                       </a>
                     ) : '–'}
                   </td>
-                  <td>
+                  <td onClick={e => e.stopPropagation()}>
                     {d.photo ? (
                       <button className="btn sm" onClick={() => setViewPhoto(d.photo)}>View</button>
                     ) : '–'}
                   </td>
                   <td><Pill c={d.status === 'Verified' ? 'green' : d.status === 'Mismatch' ? 'red' : 'yellow'}>{d.status}</Pill></td>
-                  <td>
+                  <td onClick={e => e.stopPropagation()}>
                     {d.status !== 'Verified' && (
                       <button className="btn sm" style={{ marginRight: 6 }} disabled={updating === d.id} onClick={() => handleStatus(d.id, 'Verified')}>✓ Verify</button>
                     )}
@@ -550,8 +560,72 @@ export function DepositVerification() {
           </table>
         )}
       </div>
+
+      {/* Detail modal */}
+      {detailDeposit && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.55)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={() => setDetailDeposit(null)}>
+          <div style={{ background:'#fff', borderRadius:18, padding:28, minWidth:360, maxWidth:520, width:'100%', maxHeight:'90vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <h3 style={{ margin:0 }}>Deposit Detail</h3>
+              <button style={{ border:0, background:'none', fontSize:22, cursor:'pointer', color:'var(--muted)' }} onClick={() => setDetailDeposit(null)}>✕</button>
+            </div>
+
+            {detailDeposit.method === 'New Loan Person' && (
+              <div style={{ background:'var(--yellow-bg)', border:'1.5px solid var(--yellow-tx)', borderRadius:12, padding:'14px 16px', marginBottom:18 }}>
+                <div style={{ fontWeight:700, color:'var(--yellow-tx)', fontSize:14, marginBottom:8 }}>⚠ New Loan Person — Requires Admin Approval</div>
+                <div style={{ display:'grid', gap:8 }}>
+                  <div><span style={{ fontSize:12, color:'var(--muted)', fontWeight:600 }}>PERSON NAME</span><div style={{ fontWeight:700, fontSize:16, marginTop:2 }}>👤 {detailDeposit.collectedFrom || '–'}</div></div>
+                  <div><span style={{ fontSize:12, color:'var(--muted)', fontWeight:600 }}>LOAN / APP REFERENCE</span><div className="mono" style={{ fontSize:14, marginTop:2 }}>{detailDeposit.reference || '–'}</div></div>
+                  <div><span style={{ fontSize:12, color:'var(--muted)', fontWeight:600 }}>AMOUNT</span><div className="mono" style={{ fontWeight:700, fontSize:20, marginTop:2 }}>₹{Number(detailDeposit.amount).toLocaleString('en-IN')}</div></div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display:'grid', gap:10, marginBottom:18 }}>
+              {[
+                ['Collector', detailDeposit.collectorName],
+                ['Date', detailDeposit.date],
+                ['Method', detailDeposit.method],
+                ...(detailDeposit.method !== 'New Loan Person' ? [['Collected From', detailDeposit.collectedFrom || '–']] : []),
+                ['Reference', detailDeposit.reference || '–'],
+                ['Status', detailDeposit.status],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display:'flex', justifyContent:'space-between', borderBottom:'1px solid var(--line)', paddingBottom:8 }}>
+                  <span style={{ fontSize:13, color:'var(--muted)', fontWeight:600 }}>{k}</span>
+                  <span style={{ fontSize:13, fontWeight:600 }}>{v}</span>
+                </div>
+              ))}
+            </div>
+
+            {detailDeposit.location && (
+              <div style={{ marginBottom:14 }}>
+                <a href={`https://maps.google.com/?q=${detailDeposit.location.lat},${detailDeposit.location.lng}`} target="_blank" rel="noreferrer" className="btn outline sm">📍 View Location</a>
+              </div>
+            )}
+
+            {detailDeposit.photo && (
+              <div style={{ marginBottom:18 }}>
+                <img src={detailDeposit.photo} alt="proof" style={{ width:'100%', maxHeight:200, objectFit:'cover', borderRadius:12, border:'1px solid var(--line)' }} />
+              </div>
+            )}
+
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              {detailDeposit.status !== 'Verified' && (
+                <button className="btn gold" disabled={updating === detailDeposit.id} onClick={() => handleStatus(detailDeposit.id, 'Verified')}>✓ Approve &amp; Verify</button>
+              )}
+              {detailDeposit.status !== 'Mismatch' && (
+                <button className="btn outline-red" disabled={updating === detailDeposit.id} onClick={() => handleStatus(detailDeposit.id, 'Mismatch')}>✗ Mismatch</button>
+              )}
+              {detailDeposit.status === 'Verified' && (
+                <span className="pill green" style={{ alignSelf:'center' }}>✓ Verified</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewPhoto && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setViewPhoto(null)}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setViewPhoto(null)}>
           <div style={{ background:'#fff', borderRadius:16, padding:16, maxWidth:'90vw', maxHeight:'90vh' }} onClick={e => e.stopPropagation()}>
             <img src={viewPhoto} alt="deposit proof" style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:10, display:'block' }} />
             <button className="btn outline" style={{ marginTop:12, width:'100%' }} onClick={() => setViewPhoto(null)}>Close</button>
@@ -621,7 +695,7 @@ export function Settings() {
 
         <div className="cards2">
           <Card t="Loan product · Daily 55">
-            <KV k="Interest" v="10% flat" /><KV k="Default tenure" v="55 days" />
+            <KV k="Interest" v="9% flat" /><KV k="Default tenure" v="55 days" />
             <KV k="Max active loans per CIF" v="3" /><KV k="Max exposure per CIF" v="₹25,000" /><SW k="Late fee" />
           </Card>
           <Card t="Status rules">

@@ -322,7 +322,7 @@ export function NewMemberForm() {
 }
 
 /* ===== Loan Application Form ===== */
-const LOAN_TYPES = ['Daily 55 - 10% flat', 'Weekly 12 - 12% flat', 'Monthly 12 - 14% flat', 'Gold Loan - 9% flat'];
+const LOAN_TYPES = ['Daily 55 - 9% flat', 'Weekly 12 - 12% flat', 'Monthly 12 - 14% flat', 'Gold Loan - 9% flat'];
 
 function calcEmi(amount, rate, tenure) {
   const p = parseFloat(amount) || 0, r = parseFloat(rate) || 0, t = parseInt(tenure) || 1;
@@ -339,8 +339,8 @@ export function LoanApplicationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [appId] = useState(() => 'APP-' + Math.random().toString(36).slice(2,8).toUpperCase());
-  const FIXED_AMOUNT = '5000';
-  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: FIXED_AMOUNT, tenure:'55', rate:'10', purpose:'' });
+  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5000', tenure:'55', rate:'9', purpose:'' });
+  const DOORSTEP_CHARGES = 6.80;
   const DAILY_EMI = 100;
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
   const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
@@ -363,7 +363,13 @@ export function LoanApplicationForm() {
     setDocs(p => ({ ...p, [k]: file }));
   }
 
-  function validateLoan() { return {}; }
+  function validateLoan() {
+    const e = {};
+    if (!loan.amount || Number(loan.amount) <= 0) e.amount = 'Loan amount is required';
+    if (!loan.tenure || Number(loan.tenure) <= 0) e.tenure = 'Tenure is required';
+    if (!loan.rate || Number(loan.rate) <= 0) e.rate = 'Interest rate is required';
+    return e;
+  }
   function validateBank() { return {}; }
   function validateDocs() { return {}; }
 
@@ -421,11 +427,14 @@ export function LoanApplicationForm() {
             <Field label='Application ID'><Inp value={appId} readOnly mono /></Field>
             <Field label='Member ID'><Inp value={member.memberId || memberId} readOnly mono /></Field>
             <Field label='Member Name'><Inp value={member.name || ''} readOnly /></Field>
-            <Field label='Loan Type'><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
-            <Field label='Loan Amount (Rs.)'><Inp value={loan.amount} readOnly mono /><E k='amount' /></Field>
-            <Field label='Tenure (days)'><Inp value={loan.tenure} readOnly mono /></Field>
-            <Field label='Daily EMI (Rs.)'><Inp value={DAILY_EMI} readOnly mono /></Field>
+            <Field label='Loan Type' required><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
+            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} onChange={setL('amount')} placeholder='e.g. 5000' mono /><E k='amount' /></Field>
+            <Field label='Tenure (days)' required><Inp value={loan.tenure} onChange={setL('tenure')} placeholder='e.g. 55' mono /></Field>
+            <Field label='Interest Rate (%)' required><Inp value={loan.rate} onChange={setL('rate')} placeholder='e.g. 9' mono /></Field>
+            <Field label='Daily EMI (Rs.)'><Inp value={emi || DAILY_EMI} readOnly mono /></Field>
+            <Field label='Doorstep Collection Charges (Rs.)'><Inp value={DOORSTEP_CHARGES.toFixed(2)} readOnly mono /></Field>
             <Field label='Loan Purpose'><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /><E k='purpose' /></Field>
+            <Field label=''><span style={{ fontSize:12, color:'var(--muted)' }}>Loan type, amount, tenure &amp; rate are editable above. Admin will review and may adjust before approval.</span></Field>
             <Field label='Collector'><Inp value={user.name} readOnly /></Field>
             <Field label='Collector ID'><Inp value={user.id} readOnly mono /></Field>
             <Field label='Date'><Inp value={new Date().toLocaleDateString('en-IN')} readOnly /></Field>
@@ -435,6 +444,7 @@ export function LoanApplicationForm() {
               <div><div className='eyebrow' style={{ fontSize:11 }}>Interest</div><b className='mono'>Rs.{interest}</b></div>
               <div><div className='eyebrow' style={{ fontSize:11 }}>Total Repayable</div><b className='mono'>Rs.{total}</b></div>
               <div><div className='eyebrow' style={{ fontSize:11 }}>Daily EMI</div><b className='mono'>Rs.{emi}</b></div>
+              <div><div className='eyebrow' style={{ fontSize:11 }}>Doorstep Charges</div><b className='mono'>Rs.{DOORSTEP_CHARGES.toFixed(2)}</b></div>
             </div>
           )}
           <div className='row' style={{ gap:12, justifyContent:'flex-end', marginTop:20 }}>

@@ -1,4 +1,4 @@
-const BASE = 'https://mlc-collect-backend.vercel.app/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://mlc-collect-backend.vercel.app/api';
 
 async function req(method, path, body) {
   const res = await fetch(BASE + path, {

@@ -316,14 +316,17 @@ export default function CustomerProfileDetail() {
         </div>
       </div>
 
+      {/* Full Loan Report Button — below profile card */}
+      <Link
+        to={`/app/collect/member/${memberId}/report`}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--gold)', color: 'var(--g900)', borderRadius: 12, padding: '13px 20px', fontSize: 15, fontWeight: 800, textDecoration: 'none', marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,.10)' }}
+      >
+        📊 Full Loan Report
+      </Link>
+
       {/* Overall Loan Summary */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Overall Loan Summary</div>
-          <Link to={`/app/collect/member/${memberId}/report`} style={{ background: 'var(--g800)', color: '#fff', borderRadius: 10, padding: '8px 16px', fontSize: 13, fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
-            📊 Full Loan Report
-          </Link>
-        </div>
+        <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>Overall Loan Summary</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
           {[
             { label: 'Total Loans', val: loans.length, bg: '#fff', tx: 'var(--ink)' },
