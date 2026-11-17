@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 
@@ -38,13 +38,23 @@ export default function AdminLayout() {
       .then(deps => setDepositCount(deps.filter(d => d.status === 'To verify').length))
       .catch(() => {});
   }, [pathname]);
+  const headerRef = useRef(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const update = () => document.documentElement.style.setProperty('--header-h', el.offsetHeight + 'px');
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const sub =
     pathname.startsWith('/admin/deposits') ? 'Accountable Officer'
     : pathname.startsWith('/admin/settings') ? 'Super Admin'
     : 'Loan collection · Head office';
   return (
     <div className="a-app">
-      <header className="a-top">
+      <header className="a-top" ref={headerRef}>
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
         <div className="brand">
           <div className="logo-m sm">M</div>
@@ -59,11 +69,7 @@ export default function AdminLayout() {
 
       {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
-        <div className="sidebar-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="logo-m sm">M</div>
-            <div><b style={{ fontSize: 15, display: 'block', lineHeight: 1.2 }}>Mahalaxmi Co-Op</b><small style={{ color: '#cfe3d9', fontSize: 11 }}>Admin portal</small></div>
-          </div>
+        <div className="sidebar-close-row">
           <button className="sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu">✕</button>
         </div>
         <nav className="sidebar-nav">

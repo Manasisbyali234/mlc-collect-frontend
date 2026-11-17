@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import { checkLoanEligibility, calcLoanPct } from '../loanEligibility.js';
 
 function SectionHead({ n, title }) {
   return (
@@ -68,6 +69,20 @@ export function LoanCollection() {
       setLoanStats(stats);
     }).finally(() => setLoading(false));
   }, []);
+
+  // Group apps by memberId and compute eligibility per member
+  function getMemberEligibility(memberId) {
+    const memberLoans = apps
+      .filter(a => a.memberId === memberId && ['Disbursed', 'NPA', 'Approved'].includes(a.status))
+      .map(a => {
+        const s = loanStats[a.appId];
+        const totalPaid = s ? s.totalPaid : 0;
+        const totalDue = s ? s.totalDue : Number(a.loanAmount || 0);
+        const pending = Math.max(0, totalDue - totalPaid);
+        return { ...a, totalPaid, pending, status: a.status };
+      });
+    return checkLoanEligibility(memberLoans);
+  }
 
   function loadClosing() {
     setClosingLoading(true);
@@ -179,6 +194,10 @@ export function LoanCollection() {
                   {a.status === 'Disbursed' && (() => {
                     const s = loanStats[a.appId];
                     const paidPct = s ? s.paidPct : 0;
+                    const eligibility = getMemberEligibility(a.memberId);
+                    // Only show New Loan button on the latest loan row for this member
+                    const memberDisbursed = apps.filter(x => x.memberId === a.memberId && x.status === 'Disbursed');
+                    const isLatestLoan = memberDisbursed.length === 0 || memberDisbursed[memberDisbursed.length - 1].appId === a.appId;
                     return (
                       <>
                         {s && (
@@ -186,11 +205,16 @@ export function LoanCollection() {
                             {paidPct.toFixed(0)}% paid
                           </span>
                         )}
-                        {s && paidPct >= 50 && (
+                        {isLatestLoan && eligibility.eligible && (
                           <button className='btn sm gold' onClick={() => nav('/app/loan-collection/apply/' + a.memberId)}
-                            title={`${paidPct.toFixed(1)}% repaid · eligible for new loan`}>
+                            title={eligibility.reason}>
                             + New Loan
                           </button>
+                        )}
+                        {isLatestLoan && !eligibility.eligible && (
+                          <span style={{ fontSize:11, color:'var(--muted)', fontStyle:'italic', alignSelf:'center' }} title={eligibility.reason}>
+                            Not eligible
+                          </span>
                         )}
                         <button className='btn sm outline-red' onClick={async () => {
                           if (!window.confirm('Mark this loan for recovery? Admin will be notified.')) return;
@@ -323,6 +347,12 @@ export function NewMemberForm() {
 
 /* ===== Loan Application Form ===== */
 const LOAN_TYPES = ['Daily 55 - 9% flat', 'Weekly 12 - 12% flat', 'Monthly 12 - 14% flat', 'Gold Loan - 9% flat'];
+const LOAN_TYPE_DEFAULTS = {
+  'Daily 55 - 9% flat':    { tenure: '55', rate: '9' },
+  'Weekly 12 - 12% flat':  { tenure: '12', rate: '12' },
+  'Monthly 12 - 14% flat': { tenure: '12', rate: '14' },
+  'Gold Loan - 9% flat':   { tenure: '',   rate: '9' },
+};
 
 function calcEmi(amount, rate, tenure) {
   const p = parseFloat(amount) || 0, r = parseFloat(rate) || 0, t = parseInt(tenure) || 1;
@@ -345,7 +375,14 @@ export function LoanApplicationForm() {
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
   const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
   const [err, setErr] = useState({});
-  const setL = k => e => setLoan(p => ({ ...p, [k]: e.target.value }));
+  const setL = k => e => {
+    if (k === 'loanType') {
+      const d = LOAN_TYPE_DEFAULTS[e.target.value] || {};
+      setLoan(p => ({ ...p, loanType: e.target.value, tenure: d.tenure ?? p.tenure, rate: d.rate ?? p.rate }));
+    } else {
+      setLoan(p => ({ ...p, [k]: e.target.value }));
+    }
+  };
   const setB = k => e => setBank(p => ({ ...p, [k]: e.target.value }));
   const { interest, total, emi } = calcEmi(loan.amount, loan.rate, loan.tenure);
   const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
@@ -428,13 +465,13 @@ export function LoanApplicationForm() {
             <Field label='Member ID'><Inp value={member.memberId || memberId} readOnly mono /></Field>
             <Field label='Member Name'><Inp value={member.name || ''} readOnly /></Field>
             <Field label='Loan Type' required><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
-            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} onChange={setL('amount')} placeholder='e.g. 5000' mono /><E k='amount' /></Field>
-            <Field label='Tenure (days)' required><Inp value={loan.tenure} onChange={setL('tenure')} placeholder='e.g. 55' mono /></Field>
-            <Field label='Interest Rate (%)' required><Inp value={loan.rate} onChange={setL('rate')} placeholder='e.g. 9' mono /></Field>
+            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} readOnly mono /><E k='amount' /></Field>
+            <Field label='Tenure (days)' required><Inp value={loan.tenure} readOnly mono /><E k='tenure' /></Field>
+            <Field label='Interest Rate (%)' required><Inp value={loan.rate} readOnly mono /><E k='rate' /></Field>
             <Field label='Daily EMI (Rs.)'><Inp value={emi || DAILY_EMI} readOnly mono /></Field>
             <Field label='Doorstep Collection Charges (Rs.)'><Inp value={DOORSTEP_CHARGES.toFixed(2)} readOnly mono /></Field>
             <Field label='Loan Purpose'><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /><E k='purpose' /></Field>
-            <Field label=''><span style={{ fontSize:12, color:'var(--muted)' }}>Loan type, amount, tenure &amp; rate are editable above. Admin will review and may adjust before approval.</span></Field>
+            <Field label=''><span style={{ fontSize:12, color:'var(--muted)' }}>Tenure and rate are set by loan type. Admin will review and may adjust before approval.</span></Field>
             <Field label='Collector'><Inp value={user.name} readOnly /></Field>
             <Field label='Collector ID'><Inp value={user.id} readOnly mono /></Field>
             <Field label='Date'><Inp value={new Date().toLocaleDateString('en-IN')} readOnly /></Field>

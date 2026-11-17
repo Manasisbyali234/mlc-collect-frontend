@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 const tabs = [
@@ -17,13 +17,22 @@ export default function CollectorLayout() {
   const { pathname } = useLocation();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
-  const wide = pathname === '/app' || pathname === '/app/collect';
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","role":"collector"}');
   const initials = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   function logout() { localStorage.removeItem('mlc_user'); nav('/'); }
+  const headerRef = useRef(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const update = () => document.documentElement.style.setProperty('--header-h', el.offsetHeight + 'px');
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
     <div className="m-app">
-      <header className="m-top">
+      <header className="m-top" ref={headerRef}>
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
         <div className="brand">
           <div className="logo-m sm">M</div>
@@ -34,11 +43,7 @@ export default function CollectorLayout() {
 
       {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
-        <div className="sidebar-header">
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div className="logo-m sm">M</div>
-            <div><b style={{ fontSize:15, display:'block', lineHeight:1.2 }}>Mahalaxmi Co-Op</b><small style={{ color:'#cfe3d9', fontSize:11 }}>Collector portal</small></div>
-          </div>
+        <div className="sidebar-close-row">
           <button className="sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu">✕</button>
         </div>
         <nav className="sidebar-nav">
@@ -57,7 +62,7 @@ export default function CollectorLayout() {
         </nav>
       </aside>
 
-      <main className={`m-page ${wide ? '' : 'narrow'}`}><Outlet /></main>
+      <main className="m-page"><Outlet /></main>
     </div>
   );
 }

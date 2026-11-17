@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../api.js';
+import { checkLoanEligibility, calcLoanPct } from '../loanEligibility.js';
 
 function maskAadhaar(a) {
   if (!a) return '-';
@@ -367,6 +368,37 @@ export default function CustomerProfileDetail() {
               onPayBalance={l => { setModalLoan(l); setModalMode('balance'); setAmountPaid(String(l.pending || '')); setFormErr(''); setShowModal(true); }}
             />
           ))}
+
+          {/* Next Loan Eligibility Status */}
+          {(() => {
+            const activeLoansList = loans.filter(l => ['Disbursed', 'NPA', 'Approved'].includes(l.status));
+            if (activeLoansList.length === 0) return null;
+            const eligibility = checkLoanEligibility(activeLoansList);
+            return (
+              <div style={{ border: `2px solid ${eligibility.eligible ? 'var(--g800)' : 'var(--line)'}`, borderRadius: 14, padding: '16px 20px', background: eligibility.eligible ? 'var(--green-bg)' : '#f9fbf9', marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+                  Loan {eligibility.nextLoanNumber} Eligibility
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 22 }}>{eligibility.eligible ? '✅' : '🔒'}</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: eligibility.eligible ? 'var(--green-tx)' : 'var(--ink)' }}>
+                      {eligibility.eligible ? `Eligible for Loan ${eligibility.nextLoanNumber}` : `Not yet eligible for Loan ${eligibility.nextLoanNumber}`}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>{eligibility.reason}</div>
+                  </div>
+                </div>
+                {eligibility.eligible && (
+                  <Link
+                    to={`/app/loan-collection/apply/${memberId}`}
+                    style={{ display: 'inline-block', marginTop: 14, background: 'var(--g800)', color: '#fff', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}
+                  >
+                    + Apply for Loan {eligibility.nextLoanNumber}
+                  </Link>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

@@ -46,13 +46,18 @@ export function Dashboard() {
   const kpis = [
     ['Members (CIF)', stats ? stats.totalMembers : '–', 'registered members', '/admin/customers'],
     ['Loan Applications', stats ? stats.totalApplications : '–', 'all time', '/admin/loan-applications'],
-    ['Pending Approval', stats ? stats.pendingApproval : '–', 'awaiting review', '/admin/loan-applications?status=Pending+Admin+Approval'],
-    ['Approved', stats ? stats.approved : '–', 'approved loans', '/admin/loan-applications?status=Approved'],
-    ['Disbursed', stats ? stats.disbursed : '–', 'disbursed loans', '/admin/loan-applications?status=Disbursed'],
+    ['Total Loan Value', stats ? '₹' + (stats.totalLoanValue || 0).toLocaleString('en-IN') : '–', 'all loans combined', '/admin/loan-applications'],
+    ['Service Charge Collected', stats ? '₹' + (stats.totalServiceChargeCollected || 0).toLocaleString('en-IN') : '–', '₹250 per disbursed loan', '/admin/loan-applications'],
+    ['Total Interest Collected', stats ? '₹' + (stats.totalInterestCollected || 0).toLocaleString('en-IN') : '–', '9% flat on disbursed loans', '/admin/loan-applications'],
+    ['Doorstep Collection Charges', stats ? '₹' + (stats.totalDoorstepCharges || 0).toLocaleString('en-IN') : '–', '₹6.80/day per loan', '/admin/loan-applications'],
+    ['Live Loans', stats ? stats.disbursed : '–', 'currently disbursed', '/admin/loan-applications?status=Disbursed'],
+    ['Closed Loans', stats ? (stats.closedLoans ?? '–') : '–', 'fully repaid', '/admin/loan-applications'],
     ['Total Collected', stats ? '₹' + stats.totalCollected.toLocaleString('en-IN') : '–', 'all collections', '/admin/collections'],
+    ['Pending Approval', stats ? stats.pendingApproval : '–', 'awaiting review', '/admin/loan-applications?status=Pending+Admin+Approval'],
     ['Deposits to verify', stats ? stats.pendingDeposits : '–', 'pending verification', '/admin/deposits'],
     ['Collectors', stats ? stats.totalCollectors : '–', 'active collectors', '/admin/settings'],
     ['NPA Accounts', stats ? stats.totalNPA : '–', '>10 missed EMIs', '/admin/loan-applications?status=NPA'],
+    ['NPA Value', stats ? '₹' + (stats.totalNPAValue || 0).toLocaleString('en-IN') : '–', 'total NPA loan amount', '/admin/loan-applications?status=NPA'],
     ['Missed EMI', '⚠ View', 'loans with missed payments', '/admin/missed-emi'],
   ];
 
