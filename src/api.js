@@ -93,4 +93,6 @@ export const api = {
 
   borrowerLogin: (appId, mobile) => req('POST', '/borrower/login', { appId, mobile }),
   getBorrowerDashboard: (appId) => req('GET', `/borrower/dashboard/${appId}`),
+
+  adminReset: () => req('POST', '/admin/reset', { confirm: 'RESET_ALL_DATA' }),
 };

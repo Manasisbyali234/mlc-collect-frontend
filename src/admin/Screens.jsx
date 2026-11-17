@@ -648,6 +648,22 @@ export function Settings() {
   const [form, setForm] = useState({ name: '', role: 'collector', mobile: '', branch: '', password: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [resetting, setResetting] = useState(false);
+
+  async function handleReset() {
+    if (!window.confirm('⚠️ This will permanently delete ALL customers, loans, collections, deposits, targets, and sanction letters.\n\nAdmin and Sub-Admin accounts will be preserved.\n\nType OK to confirm.')) return;
+    const input = window.prompt('Type RESET to confirm complete data wipe:');
+    if (input !== 'RESET') return;
+    setResetting(true);
+    try {
+      const r = await api.adminReset();
+      localStorage.clear();
+      sessionStorage.clear();
+      alert(`✅ Reset complete.\nDeleted: ${r.deleted.members} members, ${r.deleted.applications} applications, ${r.deleted.collections} collections, ${r.deleted.deposits} deposits, ${r.deleted.sanctionLetters} sanction letters, ${r.deleted.collectorUsers} collector users.`);
+      load();
+    } catch (e) { alert('Reset failed: ' + e.message); }
+    finally { setResetting(false); }
+  }
 
   function load() { api.getUsers().then(setUsers).catch(() => {}); }
   useEffect(load, []);
@@ -681,7 +697,10 @@ export function Settings() {
       <div>
         <div className="a-title">
           <div><h1>Users &amp; roles</h1><p>{users.length} users</p></div>
-          <button className="btn sm" onClick={openAdd}>+ Add user</button>
+          <div style={{ display:'flex', gap:10 }}>
+            <button className="btn sm" onClick={openAdd}>+ Add user</button>
+            <button className="btn sm outline-red" onClick={handleReset} disabled={resetting}>{resetting ? 'Resetting…' : '🗑 Reset All Data'}</button>
+          </div>
         </div>
         <div className="panel scroll-x">
           <table className="dtable">
