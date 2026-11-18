@@ -25,7 +25,12 @@ export const api = {
   createMember: (data) => req('POST', '/members', data),
   createMemberForm: async (formData) => {
     const res = await fetch(BASE + '/members', { method: 'POST', body: formData });
-    if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || res.statusText); }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      const e = new Error(err.error || res.statusText);
+      if (err.existingMember) e.existingMember = err.existingMember;
+      throw e;
+    }
     return res.json();
   },
 

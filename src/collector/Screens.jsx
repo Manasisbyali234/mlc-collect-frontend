@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 export { default as CustomerProfileDetail } from './CustomerProfileDetail.jsx';
 export { default as LoanReportPage } from './LoanReportPage.jsx';
-export { LoanCollection, NewMemberForm, LoanApplicationForm } from './LoanCollectionScreens.jsx';
+export { LoanCollection, NewMemberForm, LoanApplicationForm, DraftApplications, EditDraftForm } from './LoanCollectionScreens.jsx';
 function PageHeader({ title, sub, children }) {
   return (
     <div className="page-header">

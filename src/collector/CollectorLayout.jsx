@@ -11,6 +11,7 @@ const tabs = [
   { to: '/app/deposit-history', label: 'Deposit History', icon: '📒' },
   { to: '/app/targets', label: 'Targets', icon: '🎯' },
   { to: '/app/loan-collection', label: 'Loan Collection', icon: '💰' },
+  { to: '/app/loan-collection/drafts', label: 'Drafts', icon: '📝' },
 ];
 
 export default function CollectorLayout() {

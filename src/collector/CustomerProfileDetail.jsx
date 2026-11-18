@@ -307,7 +307,7 @@ export default function CustomerProfileDetail() {
             <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{member.name}</div>
             {member.occupation && <div style={{ color: '#cfe3d9', fontSize: 14, marginTop: 4 }}>{member.occupation}</div>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10, fontSize: 13, color: '#cfe3d9' }}>
-              {(member.village || member.district) && <span>&#128205; {[member.village, member.district].filter(Boolean).join(', ')}</span>}
+              {(member.village || member.taluk || member.district) && <span>&#128205; {[member.village, member.taluk, member.district].filter(Boolean).join(', ')}</span>}
               {memberSince !== '-' && <span>&#128197; Member since {memberSince}</span>}
             </div>
             <div style={{ marginTop: 12 }}>
@@ -410,7 +410,7 @@ export default function CustomerProfileDetail() {
             ['Mobile', member.mobile || '-'],
             ['Aadhaar', maskAadhaar(member.aadhaar)],
             ['PAN', member.pan || '-'],
-            ['Address', [member.address, member.village, member.district, member.state, member.pin].filter(Boolean).join(', ') || '-'],
+            ['Address', [member.address, member.village, member.taluk, member.district, member.state, member.pin].filter(Boolean).join(', ') || '-'],
           ].map(([k, v]) => (
             <div key={k} className="kv" style={{ borderBottom: '1px dashed var(--line)', padding: '10px 0' }}>
               <span style={{ color: 'var(--muted)', fontSize: 14 }}>{k}</span>

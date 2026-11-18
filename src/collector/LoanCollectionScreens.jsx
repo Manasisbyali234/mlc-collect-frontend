@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { checkLoanEligibility, calcLoanPct } from '../loanEligibility.js';
@@ -262,7 +262,7 @@ function ImageUpload({ label, value, onChange, error, required }) {
 
 export function NewMemberForm() {
   const nav = useNavigate();
-  const [f, setF] = useState({ name:'', mobile:'', altMobile:'', dob:'', gender:'', aadhaar:'', pan:'', occupation:'', address:'', village:'', district:'', state:'', pin:'', nomName:'', nomRel:'', nomMobile:'', nomAddress:'' });
+  const [f, setF] = useState({ name:'', mobile:'', altMobile:'', dob:'', gender:'', aadhaar:'', pan:'', occupation:'', address:'', village:'', taluk:'', district:'', state:'', pin:'', nomName:'', nomRel:'', nomMobile:'', nomAddress:'' });
   const [photo, setPhoto] = useState(null);
   const [shopImage, setShopImage] = useState(null);
   const [err, setErr] = useState({});
@@ -291,6 +291,11 @@ export function NewMemberForm() {
       const member = await api.createMemberForm(formData);
       nav('/app/loan-collection/apply/' + member.memberId);
     } catch (err) {
+      if (err.existingMember) {
+        // Member already exists â€” go directly to loan application
+        nav('/app/loan-collection/apply/' + err.existingMember.memberId);
+        return;
+      }
       setSubmitError(err.message || 'Something went wrong. Please try again.');
     }
   }
@@ -317,6 +322,7 @@ export function NewMemberForm() {
             <ImageUpload label='Shop Image' value={shopImage} onChange={setShopImage} error={err.shopImage} required />
             <Field label='Address'><Inp value={f.address} onChange={set('address')} placeholder='House no, street, area' /></Field>
             <Field label='Village / City'><Inp value={f.village} onChange={set('village')} /></Field>
+            <Field label='Taluk'><Inp value={f.taluk} onChange={set('taluk')} /></Field>
             <Field label='District'><Inp value={f.district} onChange={set('district')} /></Field>
             <Field label='State'><Inp value={f.state} onChange={set('state')} /></Field>
             <Field label='PIN Code'><Inp value={f.pin} onChange={set('pin')} placeholder='6 digits' mono /></Field>
@@ -333,7 +339,7 @@ export function NewMemberForm() {
         </div>
         {submitError && (
           <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-tx)', borderRadius:10, padding:'12px 16px', marginBottom:16, color:'var(--red-tx)', fontSize:14 }}>
-            âš ï¸ {submitError}
+            &#9888; {submitError}
           </div>
         )}
         <div className='row' style={{ gap:12, justifyContent:'flex-end' }}>
@@ -342,6 +348,265 @@ export function NewMemberForm() {
         </div>
       </div>
     </form>
+  );
+}
+
+/* ===== Draft Applications List ===== */
+export function DraftApplications() {
+  const [drafts, setDrafts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const nav = useNavigate();
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+
+  useEffect(() => {
+    api.getApplications({ collectorId: user.id })
+      .then(list => setDrafts(list.filter(a => a.status === 'Draft')))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>;
+
+  return (
+    <>
+      <div className='page-header'>
+        <div><h1>Draft Applications</h1><p>Saved drafts — edit and submit when ready</p></div>
+        <div className='right'>
+          <Link to='/app/loan-collection/new-member' className='btn gold'>+ New Application</Link>
+        </div>
+      </div>
+      {drafts.length === 0 ? (
+        <div className='panel pad' style={{ textAlign:'center', padding:48 }}>
+          <p className='muted'>No draft applications yet.</p>
+        </div>
+      ) : (
+        <div className='panel scroll-x'>
+          <table className='dtable'>
+            <thead><tr><th>App ID</th><th>Member</th><th>Mobile</th><th>Loan Type</th><th className='r'>Amount</th><th>Date</th><th></th></tr></thead>
+            <tbody>{drafts.map(a => (
+              <tr key={a.appId}>
+                <td className='mono' style={{ fontSize:13 }}>{a.appId}</td>
+                <td><b>{a.memberName}</b><div className='muted' style={{ fontSize:12 }}>{a.memberId}</div></td>
+                <td className='mono'>{a.mobile}</td>
+                <td>{a.loanType}</td>
+                <td className='r mono'>Rs.{a.loanAmount}</td>
+                <td className='mono' style={{ fontSize:13 }}>{a.date}</td>
+                <td>
+                  <button className='btn sm gold' onClick={() => nav('/app/loan-collection/edit-draft/' + a.appId)}>Edit</button>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ===== Edit Draft Form ===== */
+export function EditDraftForm() {
+  const nav = useNavigate();
+  const pathParts = window.location.pathname.split('/');
+  const draftAppId = pathParts[pathParts.length - 1];
+  const [member, setMember] = useState({});
+  const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5000', tenure:'55', rate:'9', purpose:'' });
+  const DOORSTEP_CHARGES = 6.80;
+  const DAILY_EMI = 100;
+  const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
+  const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
+  const [err, setErr] = useState({});
+  const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
+
+  useEffect(() => {
+    api.getApplication(draftAppId).then(data => {
+      setLoan({ loanType: data.loanType || LOAN_TYPES[0], amount: String(data.loanAmount || '5000'), tenure: String(data.tenure || '55'), rate: String(data.rate || '9'), purpose: data.purpose || '' });
+      if (data.bank) setBank(data.bank);
+      api.getMember(data.memberId).then(setMember).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [draftAppId]);
+
+  const setL = k => e => {
+    if (k === 'loanType') {
+      const d = LOAN_TYPE_DEFAULTS[e.target.value] || {};
+      setLoan(p => ({ ...p, loanType: e.target.value, tenure: d.tenure ?? p.tenure, rate: d.rate ?? p.rate }));
+    } else {
+      setLoan(p => ({ ...p, [k]: e.target.value }));
+    }
+  };
+  const setB = k => e => setBank(p => ({ ...p, [k]: e.target.value }));
+  const { interest, total, emi } = calcEmi(loan.amount, loan.rate, loan.tenure);
+  const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
+
+  function handleDoc(k, e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!['image/jpeg','image/png','application/pdf'].includes(file.type)) { setErr(p => ({ ...p, [k]:'Only JPG, PNG, PDF allowed' })); return; }
+    if (file.size > 5 * 1024 * 1024) { setErr(p => ({ ...p, [k]:'Max 5 MB' })); return; }
+    setErr(p => { const n = { ...p }; delete n[k]; return n; });
+    setDocs(p => ({ ...p, [k]: file }));
+  }
+
+  function buildRecord(status) {
+    return { appId: draftAppId, memberId: member.memberId, memberName: member.name, mobile: member.mobile, loanType: loan.loanType, loanAmount: loan.amount, tenure: loan.tenure, rate: loan.rate, purpose: loan.purpose, interest, total, emi, bank, docs: Object.fromEntries(Object.entries(docs).filter(([,v])=>v).map(([k,v])=>[k,{name:v.name,size:v.size}])), date: new Date().toLocaleDateString('en-IN'), status, collectorName: user.name, collectorId: user.id, statusHistory:[{ status, date: new Date().toLocaleString(), by: user.name }] };
+  }
+
+  async function saveDraft() {
+    try {
+      await api.saveApplication(buildRecord('Draft'));
+      alert('Draft updated.');
+    } catch (e) { alert('Error: ' + e.message); }
+  }
+
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await api.saveApplication(buildRecord('Pending Admin Approval'));
+      setSubmitted(true);
+    } catch (e) { alert(e.message || 'Submission failed'); }
+    finally { setSubmitting(false); }
+  }
+
+  if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading draft</p></div>;
+
+  if (submitted) return (
+    <div style={{ maxWidth:600, margin:'60px auto', textAlign:'center' }}>
+      <div style={{ fontSize:64 }}>&#10003;</div>
+      <h2 style={{ marginTop:16 }}>Application Submitted!</h2>
+      <p className='muted'>Application ID: <b className='mono'>{draftAppId}</b></p>
+      <p className='muted'>Status: <span className='pill yellow'>Pending Admin Approval</span></p>
+      <Link to='/app/loan-collection/drafts' className='btn gold' style={{ display:'inline-block', marginTop:20 }}>Back to Drafts</Link>
+    </div>
+  );
+
+  const steps = ['Loan Details', 'Bank Details', 'Documents', 'Review & Submit'];
+  return (
+    <div style={{ maxWidth:900 }}>
+      <div className='page-header'>
+        <div><h1>Edit Draft</h1><p>{member.name || 'Member'} &middot; {member.memberId} &middot; App: {draftAppId}</p></div>
+        <div className='right'><Link to='/app/loan-collection/drafts' className='btn outline sm'>Cancel</Link></div>
+      </div>
+      <div className='lc-steps'>
+        {steps.map((s, i) => <div key={s} className={'lc-step' + (step === i+1 ? ' active' : step > i+1 ? ' done' : '')}><span>{i+1}</span>{s}</div>)}
+      </div>
+
+      {step === 1 && (
+        <div className='panel pad' style={{ marginTop:18 }}>
+          <SectionHead n='1' title='Loan Details' />
+          <div className='form-grid fg3' style={{ gap:14 }}>
+            <Field label='Application ID'><Inp value={draftAppId} readOnly mono /></Field>
+            <Field label='Member ID'><Inp value={member.memberId || ''} readOnly mono /></Field>
+            <Field label='Member Name'><Inp value={member.name || ''} readOnly /></Field>
+            <Field label='Loan Type' required><Sel value={loan.loanType} onChange={setL('loanType')}>{LOAN_TYPES.map(t => <option key={t}>{t}</option>)}</Sel></Field>
+            <Field label='Loan Amount (Rs.)' required><Inp value={loan.amount} readOnly mono /></Field>
+            <Field label='Tenure (days)' required><Inp value={loan.tenure} readOnly mono /></Field>
+            <Field label='Interest Rate (%)' required><Inp value={loan.rate} readOnly mono /></Field>
+            <Field label='Daily EMI (Rs.)'><Inp value={emi || DAILY_EMI} readOnly mono /></Field>
+            <Field label='Doorstep Collection Charges (Rs.)'><Inp value={DOORSTEP_CHARGES.toFixed(2)} readOnly mono /></Field>
+            <Field label='Loan Purpose'><Inp value={loan.purpose} onChange={setL('purpose')} placeholder='e.g. Business expansion' /></Field>
+            <Field label='Collector'><Inp value={user.name} readOnly /></Field>
+          </div>
+          {loan.amount > 0 && (
+            <div style={{ background:'var(--green-bg)', borderRadius:12, padding:14, marginTop:18, display:'flex', gap:32 }}>
+              <div><div className='eyebrow' style={{ fontSize:11 }}>Interest</div><b className='mono'>Rs.{interest}</b></div>
+              <div><div className='eyebrow' style={{ fontSize:11 }}>Total Repayable</div><b className='mono'>Rs.{total}</b></div>
+              <div><div className='eyebrow' style={{ fontSize:11 }}>Daily EMI</div><b className='mono'>Rs.{emi}</b></div>
+            </div>
+          )}
+          <div className='row' style={{ gap:12, justifyContent:'flex-end', marginTop:20 }}>
+            <button type='button' className='btn outline' onClick={saveDraft}>Save Draft</button>
+            <button type='button' className='btn gold' onClick={() => setStep(2)}>Next: Bank Details</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className='panel pad' style={{ marginTop:18 }}>
+          <SectionHead n='2' title='Bank Account Details' />
+          <div className='form-grid fg3' style={{ gap:14 }}>
+            <Field label='Account Holder Name'><Inp value={bank.holderName} onChange={setB('holderName')} /></Field>
+            <Field label='Bank Name'><Inp value={bank.bankName} onChange={setB('bankName')} /></Field>
+            <Field label='Branch Name'><Inp value={bank.branch} onChange={setB('branch')} /></Field>
+            <Field label='Account Number'><Inp value={bank.accNo} onChange={setB('accNo')} mono /></Field>
+            <Field label='Confirm Account Number'><Inp value={bank.accNoConfirm} onChange={setB('accNoConfirm')} mono /></Field>
+            <Field label='IFSC Code'><Inp value={bank.ifsc} onChange={setB('ifsc')} mono placeholder='e.g. KVGB0001234' /></Field>
+            <Field label='Account Type'><Sel value={bank.accType} onChange={setB('accType')}><option>Savings</option><option>Current</option></Sel></Field>
+            <Field label='UPI ID (optional)'><Inp value={bank.upi} onChange={setB('upi')} mono /></Field>
+          </div>
+          <div className='row' style={{ gap:12, justifyContent:'flex-end', marginTop:20 }}>
+            <button type='button' className='btn outline' onClick={() => setStep(1)}>Back</button>
+            <button type='button' className='btn outline' onClick={saveDraft}>Save Draft</button>
+            <button type='button' className='btn gold' onClick={() => setStep(3)}>Next: Documents</button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className='panel pad' style={{ marginTop:18 }}>
+          <SectionHead n='3' title='Document Upload' />
+          <div className='form-grid fg3' style={{ gap:14 }}>
+            {[['aadhaarFront','Aadhaar Card - Front'],['aadhaarBack','Aadhaar Card - Back'],['pan','PAN Card'],['passbook','Bank Passbook - First Page'],['photo','Member Passport Photo'],['addressProof','Address Proof'],['nomineeId','Nominee ID Proof'],['other','Other Documents']].map(([key, label]) => (
+              <Field key={key} label={label}>
+                {docs[key] ? (
+                  <div style={{ border:'1px solid var(--g800)', borderRadius:12, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--green-bg)' }}>
+                    <span style={{ fontSize:13, color:'var(--green-tx)' }}>&#10003; {docs[key].name}</span>
+                    <button type='button' style={{ border:0, background:'none', color:'var(--red-tx)', cursor:'pointer', fontSize:13 }} onClick={() => setDocs(p => ({ ...p, [key]:null }))}>Remove</button>
+                  </div>
+                ) : (
+                  <label style={{ display:'block', border:'1.5px dashed var(--line)', borderRadius:12, padding:14, textAlign:'center', cursor:'pointer', fontSize:13, color:'var(--muted)' }}>
+                    + Upload (JPG/PNG/PDF, max 5MB)
+                    <input type='file' accept='.jpg,.jpeg,.png,.pdf' style={{ display:'none' }} onChange={e => handleDoc(key, e)} />
+                  </label>
+                )}
+                <E k={key} />
+              </Field>
+            ))}
+          </div>
+          <div className='row' style={{ gap:12, justifyContent:'flex-end', marginTop:20 }}>
+            <button type='button' className='btn outline' onClick={() => setStep(2)}>Back</button>
+            <button type='button' className='btn outline' onClick={saveDraft}>Save Draft</button>
+            <button type='button' className='btn gold' onClick={() => setStep(4)}>Next: Review</button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div style={{ marginTop:18 }}>
+          <div className='panel pad' style={{ marginBottom:14 }}>
+            <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>Member Details</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[['Name',member.name],['Member ID',member.memberId],['Mobile',member.mobile]].map(([k,v]) => (
+                <div key={k} className='kv'><span className='sans'>{k}</span><span>{v}</span></div>
+              ))}
+            </div>
+          </div>
+          <div className='panel pad' style={{ marginBottom:14 }}>
+            <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>Loan Details</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[['Loan Type',loan.loanType],['Amount','Rs.'+loan.amount],['Tenure',loan.tenure+' days'],['Rate',loan.rate+'%'],['Interest','Rs.'+interest],['Total','Rs.'+total],['EMI','Rs.'+emi],['Purpose',loan.purpose]].map(([k,v]) => (
+                <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono'>{v}</span></div>
+              ))}
+            </div>
+          </div>
+          <div className='panel pad' style={{ marginBottom:14 }}>
+            <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>Bank Details</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[['Holder',bank.holderName],['Bank',bank.bankName],['Branch',bank.branch],['Account','XXXX'+bank.accNo.slice(-4)],['IFSC',bank.ifsc],['Type',bank.accType]].map(([k,v]) => (
+                <div key={k} className='kv'><span className='sans'>{k}</span><span className='mono'>{v}</span></div>
+              ))}
+            </div>
+          </div>
+          <div className='row' style={{ gap:12, justifyContent:'flex-end' }}>
+            <button type='button' className='btn outline' onClick={() => setStep(3)}>Back</button>
+            <button type='button' className='btn outline' onClick={saveDraft}>Save Draft</button>
+            <button type='button' className='btn gold' style={{ padding:'14px 32px' }} onClick={handleSubmit} disabled={submitting}>{submitting ? 'Submitting' : 'Submit Application'}</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -546,7 +811,7 @@ export function LoanApplicationForm() {
           <div className='panel pad' style={{ marginBottom:14 }}>
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>Member Details</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              {[['Name',member.name],['Member ID',member.memberId],['Mobile',member.mobile],['Aadhaar','XXXX XXXX '+(member.aadhaar||'').slice(-4)],['PAN',member.pan],['Address',member.address]].map(([k,v]) => (
+              {[['Name',member.name],['Member ID',member.memberId],['Mobile',member.mobile],['Aadhaar','XXXX XXXX '+(member.aadhaar||'').slice(-4)],['PAN',member.pan],['Address',member.address],['Village',member.village],['Taluk',member.taluk],['District',member.district],['State',member.state]].filter(([,v])=>v).map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span>{v}</span></div>
               ))}
             </div>

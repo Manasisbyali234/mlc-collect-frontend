@@ -7,6 +7,7 @@ import CollectorLayout from './collector/CollectorLayout.jsx';
 import {
   Home, Collect, Customer, Record, LoanAccount, Deposit, DepositHistory, Targets,
   LoanCollection, NewMemberForm, LoanApplicationForm, CustomerProfileDetail, LoanReportPage,
+  DraftApplications, EditDraftForm,
 } from './collector/Screens.jsx';
 import { Defaulters } from './collector/DefaultersScreen.jsx';
 import { NPAList } from './collector/NPAListScreen.jsx';
@@ -254,6 +255,8 @@ export default function App() {
         <Route path="loan-collection" element={<LoanCollection />} />
         <Route path="loan-collection/new-member" element={<NewMemberForm />} />
         <Route path="loan-collection/apply/:memberId" element={<LoanApplicationForm />} />
+        <Route path="loan-collection/drafts" element={<DraftApplications />} />
+        <Route path="loan-collection/edit-draft/:appId" element={<EditDraftForm />} />
         <Route path="defaulters" element={<Defaulters />} />
         <Route path="npa" element={<NPAList />} />
       </Route>

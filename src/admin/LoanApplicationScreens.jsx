@@ -246,7 +246,7 @@ export function ApplicationDetail() {
               </div>
             )}
             <div className='info-grid'>
-              {[['Name',app.memberName],['Member ID',app.memberId],['Mobile',app.mobile],['Alt Mobile',member.altMobile],['DOB',member.dob],['Gender',member.gender],['Aadhaar','XXXX XXXX '+(member.aadhaar||'').slice(-4)],['PAN',member.pan],['Occupation',member.occupation],['Address',member.address],['Village',member.village],['District',member.district],['State',member.state],['PIN',member.pin]].filter(([,v])=>v).map(([k,v]) => (
+              {[['Name',app.memberName],['Member ID',app.memberId],['Mobile',app.mobile],['Alt Mobile',member.altMobile],['DOB',member.dob],['Gender',member.gender],['Aadhaar','XXXX XXXX '+(member.aadhaar||'').slice(-4)],['PAN',member.pan],['Occupation',member.occupation],['Address',member.address],['Village',member.village],['Taluk',member.taluk],['District',member.district],['State',member.state],['PIN',member.pin]].filter(([,v])=>v).map(([k,v]) => (
                 <div key={k} className='kv'><span className='sans'>{k}</span><span>{v}</span></div>
               ))}
             </div>
