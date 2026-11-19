@@ -57,7 +57,7 @@ function printApprovalLetter(app) {
     <div class="kv"><span>Net Disbursal Amount</span><b>${fmtINR(net)}</b></div>
     <div class="kv"><span>Approved Tenure</span><b>${app.approvedTenure} days</b></div>
     <div class="kv"><span>Interest Rate</span><b>${app.confirmedRate}% per annum</b></div>
-    <div class="kv"><span>Door Step Collection Charge</span><b>Rs. 6.80 per day</b></div>
+    <div class="kv"><span>Door Step Collection Charge</span><b>Rs. 7.40 per day</b></div>
     <div class="kv"><span>Collector</span><b>${app.collectorName}</b></div>
     ${app.adminRemark ? `<div class="kv" style="grid-column:1/-1"><span>Admin Remark</span><b>${app.adminRemark}</b></div>` : ''}
   </div>

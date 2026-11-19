@@ -413,7 +413,7 @@ export function EditDraftForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5000', tenure:'55', rate:'9', purpose:'' });
-  const DOORSTEP_CHARGES = 6.80;
+  const DOORSTEP_CHARGES = 7.40;
   const DAILY_EMI = 100;
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
   const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
@@ -635,24 +635,7 @@ export function LoanApplicationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [appId] = useState(() => 'APP-' + Math.random().toString(36).slice(2,8).toUpperCase());
   const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5000', tenure:'55', rate:'9', purpose:'' });
-  const DOORSTEP_CHARGES = 6.80;
-  const DAILY_EMI = 100;
-  const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
-  const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
-  const [err, setErr] = useState({});
-  const setL = k => e => {
-    if (k === 'loanType') {
-      const d = LOAN_TYPE_DEFAULTS[e.target.value] || {};
-      setLoan(p => ({ ...p, loanType: e.target.value, tenure: d.tenure ?? p.tenure, rate: d.rate ?? p.rate }));
-    } else {
-      setLoan(p => ({ ...p, [k]: e.target.value }));
-    }
-  };
-  const setB = k => e => setBank(p => ({ ...p, [k]: e.target.value }));
-  const { interest, total, emi } = calcEmi(loan.amount, loan.rate, loan.tenure);
-  const E = ({ k }) => err[k] ? <span style={{ color:'var(--red-tx)', fontSize:12, display:'block', marginTop:3 }}>{err[k]}</span> : null;
-
-  useEffect(() => { api.getMember(memberId).then(setMember).catch(() => {}); }, [memberId]);
+  const DOORSTEP_CHARGES = 7.40;
 
   const user = JSON.parse(localStorage.getItem('mlc_user') || '{"name":"Collector","id":"COL-001"}');
 

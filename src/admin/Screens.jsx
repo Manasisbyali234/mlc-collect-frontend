@@ -48,7 +48,7 @@ export function Dashboard() {
     ['Loan Applications', stats ? stats.totalApplications : '–', 'all time', '/admin/loan-applications'],
     ['Total Loan Value', stats ? '₹' + (stats.totalLoanValue || 0).toLocaleString('en-IN') : '–', 'all loans combined', '/admin/loan-applications'],
     ['Service Charge Collected', stats ? '₹' + (stats.totalServiceChargeCollected || 0).toLocaleString('en-IN') : '–', '₹250 per disbursed loan', '/admin/loan-applications'],
-    ['Total Interest Collected', stats ? '₹' + (stats.totalInterestCollected || 0).toLocaleString('en-IN') : '–', '9% flat on disbursed loans', '/admin/loan-applications'],
+    ['Total Interest Collected', stats ? '₹' + (stats.totalInterestCollected || 0).toLocaleString('en-IN') : '–', 'collections beyond principal', '/admin/loan-applications'],
     ['Doorstep Collection Charges', stats ? '₹' + (stats.totalDoorstepCharges || 0).toLocaleString('en-IN') : '–', '₹6.80/day per loan', '/admin/loan-applications'],
     ['Live Loans', stats ? stats.disbursed : '–', 'currently disbursed', '/admin/loan-applications?status=Disbursed'],
     ['Closed Loans', stats ? (stats.closedLoans ?? '–') : '–', 'fully repaid', '/admin/loan-applications'],
