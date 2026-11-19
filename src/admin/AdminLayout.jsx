@@ -11,6 +11,7 @@ const tabs = [
   { to: '/admin/loan-applications?status=NPA', label: 'NPA Accounts', icon: '🔴' },
   { to: '/admin/missed-emi', label: 'Missed EMI', icon: '⚠️' },
   { to: '/admin/collections', label: 'Collections', icon: '💰' },
+  { to: '/admin/collectors', label: 'Collectors', icon: '👤' },
   { to: '/admin/deposits', label: 'Deposits', icon: '🏦', depositBadge: true },
   { to: '/admin/targets', label: 'Targets', icon: '🎯' },
   { to: '/admin/alerts', label: 'Alerts', icon: '🔔' },

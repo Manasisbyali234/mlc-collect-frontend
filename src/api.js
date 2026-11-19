@@ -65,6 +65,9 @@ export const api = {
 
   getUsers: () => req('GET', '/users'),
   createUser: (data) => req('POST', '/users', data),
+  updateUser: (id, data) => req('PATCH', `/users/${id}`, data),
+  deleteUser: (id) => req('DELETE', `/users/${id}`),
+  getCollectorStats: () => req('GET', '/collectors/stats'),
 
   getTargets: () => req('GET', '/targets'),
   saveTarget: (data) => req('POST', '/targets', data),
