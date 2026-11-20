@@ -85,15 +85,22 @@ export function LoanApplications() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const sf = searchParams.get('status') || 'All';
   const setSf = v => setSearchParams(v === 'All' ? {} : { status: v });
-  useEffect(() => { api.getApplications().then(d => setApps(d.filter(a => a.status !== 'Draft'))).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    api.getApplications()
+      .then(d => setApps(d.filter(a => a.status !== 'Draft')))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
   const filtered = apps.filter(a => {
     const q = search.toLowerCase();
     const ms = !q || [a.memberName, a.memberId, a.appId, a.mobile, a.collectorName].some(v => v && v.toLowerCase().includes(q));
-    return ms && (sf === 'All' || a.status === sf);
+    return ms && (sf === 'All' || (a.status || '').trim().toLowerCase() === sf.trim().toLowerCase());
   });
   if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>;
+  if (error) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p style={{ color:'var(--red-tx)' }}>Failed to load applications: {error}</p></div>;
   return (
     <>
       <div className='a-title'>
