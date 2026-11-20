@@ -231,13 +231,13 @@ export function ApplicationDetail() {
             <div className='eyebrow' style={{ fontSize:11, marginBottom:10 }}>1 &middot; Member Personal Information</div>
             {(member.photo || member.shopImage) && (
               <div style={{ marginBottom:12, paddingBottom:12, borderBottom:'1px dashed var(--line)', display:'flex', gap:20, flexWrap:'wrap' }}>
-                {member.photo && (
+                {member.photo && /^(data:|https?:)/.test(member.photo) && (
                   <div>
                     <div style={{ fontSize:11, color:'var(--muted)', marginBottom:6 }}>Person Photo</div>
                     <img src={member.photo} alt='Member' style={{ width:200, height:240, objectFit:'cover', borderRadius:10, border:'1px solid var(--line)' }} />
                   </div>
                 )}
-                {member.shopImage && (
+                {member.shopImage && /^(data:|https?:)/.test(member.shopImage) && (
                   <div>
                     <div style={{ fontSize:11, color:'var(--muted)', marginBottom:6 }}>Shop Image</div>
                     <img src={member.shopImage} alt='Shop' style={{ width:320, height:240, objectFit:'cover', borderRadius:10, border:'1px solid var(--line)' }} />
