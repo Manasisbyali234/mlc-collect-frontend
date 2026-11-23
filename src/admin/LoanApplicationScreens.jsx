@@ -5,7 +5,7 @@ import { api } from '../api.js';
 const STATUS_ORDER = ['Pending Admin Approval','Under Review','Sanctioned','Approved','Rejected','Disbursed','NPA','Recovery','Recovered','Written Off'];
 const SC = { 'Pending Admin Approval':'yellow', 'Under Review':'yellow', Sanctioned:'yellow', Approved:'green', Rejected:'red', Disbursed:'green', Draft:'grey', NPA:'red', Recovery:'red', Recovered:'green', 'Written Off':'grey' };
 const Pill = ({ c, children }) => <span className={'pill ' + c}>{children}</span>;
-function calcFee(amount) { return Math.floor(Number(amount) / 5000) * 250; }
+function calcFee(amount) { return Math.floor(Number(amount) / 5500) * 250; }
 const fmtLoanType = t => (t || '').replace(/10%\s*flat/gi, '9% flat').replace(/^(Daily\s*55)\s*(-\s*)?$/i, 'Daily 55 - 9% flat');
 
 function fmtINR(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
@@ -187,7 +187,7 @@ export function ApplicationDetail() {
 
   function handleSanction() {
     if (!sanctionAmount) { alert('Enter sanction amount'); return; }
-    if (Number(sanctionAmount) < 5000 || Number(sanctionAmount) % 5000 !== 0) { alert('Sanction amount must be a multiple of Rs.5,000 (e.g. 5000, 10000, 15000)'); return; }
+    if (Number(sanctionAmount) < 5500 || Number(sanctionAmount) % 5500 !== 0) { alert('Sanction amount must be a multiple of Rs.5,500 (e.g. 5500, 11000, 16500)'); return; }
     const fee = serviceCharge !== '' ? Number(serviceCharge) : calcFee(sanctionAmount);
     if (isNaN(fee) || fee < 0) { alert('Enter a valid service charge'); return; }
     const net = Number(sanctionAmount) - fee;
@@ -517,3 +517,4 @@ export function ApplicationDetail() {
     </>
   );
 }
+

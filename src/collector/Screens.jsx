@@ -868,8 +868,8 @@ export function Deposit() {
             <div className="chips" style={{ marginBottom: howErr ? 6 : 18 }}>
               {['Cash', 'UPI', 'New Loan Person', 'Handed to Office'].map((h) => (
                 <button key={h} className={`chip ${how === h ? 'active' : ''}`} onClick={() => {
-                  if (h === 'New Loan Person' && Math.max(0, totalCollected - totalVerified) < 5000) {
-                    setHowErr('New Loan Person option requires ₹5,000+ undeposited amount.');
+                  if (h === 'New Loan Person' && Math.max(0, totalCollected - totalVerified) < 5500) {
+                    setHowErr('New Loan Person option requires ₹5,500+ undeposited amount.');
                     return;
                   }
                   setHowErr('');
@@ -1054,3 +1054,5 @@ export function Targets() {
     </>
   );
 }
+
+

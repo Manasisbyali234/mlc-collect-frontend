@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { checkLoanEligibility, calcLoanPct } from '../loanEligibility.js';
@@ -292,7 +292,7 @@ export function NewMemberForm() {
       nav('/app/loan-collection/apply/' + member.memberId);
     } catch (err) {
       if (err.existingMember) {
-        // Member already exists â€” go directly to loan application
+        // Member already exists — go directly to loan application
         nav('/app/loan-collection/apply/' + err.existingMember.memberId);
         return;
       }
@@ -369,7 +369,7 @@ export function DraftApplications() {
   return (
     <>
       <div className='page-header'>
-        <div><h1>Draft Applications</h1><p>Saved drafts — edit and submit when ready</p></div>
+        <div><h1>Draft Applications</h1><p>Saved drafts � edit and submit when ready</p></div>
         <div className='right'>
           <Link to='/app/loan-collection/new-member' className='btn gold'>+ New Application</Link>
         </div>
@@ -412,7 +412,7 @@ export function EditDraftForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5000', tenure:'55', rate:'9', purpose:'' });
+  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5500', tenure:'55', rate:'9', purpose:'' });
   const DOORSTEP_CHARGES = 7.40;
   const DAILY_EMI = 100;
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
@@ -422,7 +422,7 @@ export function EditDraftForm() {
 
   useEffect(() => {
     api.getApplication(draftAppId).then(data => {
-      setLoan({ loanType: data.loanType || LOAN_TYPES[0], amount: String(data.loanAmount || '5000'), tenure: String(data.tenure || '55'), rate: String(data.rate || '9'), purpose: data.purpose || '' });
+      setLoan({ loanType: data.loanType || LOAN_TYPES[0], amount: String(data.loanAmount || '5500'), tenure: String(data.tenure || '55'), rate: String(data.rate || '9'), purpose: data.purpose || '' });
       if (data.bank) setBank(data.bank);
       api.getMember(data.memberId).then(setMember).catch(() => {});
     }).catch(() => {}).finally(() => setLoading(false));
@@ -635,7 +635,7 @@ export function LoanApplicationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [appId] = useState(() => 'APP-' + Math.random().toString(36).slice(2,8).toUpperCase());
-  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5000', tenure:'55', rate:'9', purpose:'' });
+  const [loan, setLoan] = useState({ loanType: LOAN_TYPES[0], amount: '5500', tenure:'55', rate:'9', purpose:'' });
   const [bank, setBank] = useState({ holderName:'', bankName:'', branch:'', accNo:'', accNoConfirm:'', ifsc:'', accType:'Savings', upi:'' });
   const [docs, setDocs] = useState({ aadhaarFront:null, aadhaarBack:null, pan:null, passbook:null, photo:null, addressProof:null, nomineeId:null, other:null });
   const [err, setErr] = useState({});
@@ -855,3 +855,4 @@ export function LoanApplicationForm() {
     </div>
   );
 }
+
