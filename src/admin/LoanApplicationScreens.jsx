@@ -174,7 +174,10 @@ export function ApplicationDetail() {
 
   if (loading) return <div className='panel pad' style={{ textAlign:'center', padding:48 }}><p className='muted'>Loading</p></div>;
   if (!app) return (
-    <div><p className='muted'>Application not found.</p><Link to='/admin/loan-applications' className='btn outline sm'>Back</Link></div>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'60vh', gap:16 }}>
+      <p className='muted'>Application not found.</p>
+      <Link to='/admin/loan-applications' className='btn outline sm'>Back</Link>
+    </div>
   );
 
   async function updateStatus(newStatus, extra) {
