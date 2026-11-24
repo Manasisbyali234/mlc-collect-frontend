@@ -214,7 +214,7 @@ export default function Login() {
           </form>
         )}
 
-        <div className="powered">Powered by Crinsun Technologies</div>
+        <div className="powered">Powered by Propractical India.co.in</div>
       </div>
     </div>
   );

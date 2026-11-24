@@ -54,7 +54,7 @@ export default function BorrowerLogin() {
             {loading ? 'Signing in...' : 'View My Loan'}
           </button>
         </form>
-        <div className="powered">Powered by Crinsun Technologies</div>
+        <div className="powered">Powered by Propractical India.co.in</div>
       </div>
     </div>
   );

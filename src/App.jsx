@@ -228,7 +228,7 @@ function Launcher() {
           <div className="logo-m sm">M</div>
           <span><b>MLC</b> – Maha Laxmi Collect</span>
         </div>
-        <p>Powered by <b>Crinsun Technologies</b></p>
+        <p>Powered by <b>Propractical India.co.in</b></p>
       </footer>
     </div>
   );
